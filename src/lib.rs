@@ -7,7 +7,7 @@ use num_traits::cast::ToPrimitive;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -68,7 +68,7 @@ pub struct Sprite {
 pub struct Tile {
     pub sprite: Rc<Sprite>,
     /// todo: neighbours per side
-    neighbors: HashMap<Direction, HashMap<u64, Rc<Self>>>,
+    pub neighbors: HashMap<Direction, HashMap<u64, Rc<Self>>>,
 
     id: u64,
 }
@@ -80,7 +80,7 @@ impl Tile {
         let tile_height = image_height / grid_size.height;
 
         let mut unique: HashMap<u64, Rc<Self>> = Default::default();
-        let mut grid: Vec<Rc<Self>> = Default::default();;
+        let mut grid: Vec<Rc<Self>> = Default::default();
 
         debug!("Generating tiles");
 
