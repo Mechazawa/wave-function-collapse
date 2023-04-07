@@ -4,9 +4,8 @@ use image::GenericImageView;
 use image::ImageBuffer;
 use image::Pixel;
 use log::debug;
-use log::trace;
 use num_traits::cast::ToPrimitive;
-use rand::rngs::ThreadRng;
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -19,12 +18,6 @@ use std::str::FromStr;
 pub struct Size {
     pub width: usize,
     pub height: usize,
-}
-
-impl Size {
-    pub fn area(&self) -> usize {
-        self.width * self.height
-    }
 }
 
 impl FromStr for Size {
@@ -68,7 +61,7 @@ impl Tile {
         let mut unique: HashMap<u64, Self> = Default::default();
 
         debug!("Generating tiles");
-        let mut grid = Grid::new(grid_size.width as usize, grid_size.height as usize, &mut |x, y| {
+        let grid = Grid::new(grid_size.width as usize, grid_size.height as usize, &mut |x, y| {
             let view = image.view(x as u32 * tile_width, y as u32 * tile_height, tile_width, tile_height);
 
             let buffer =
@@ -98,8 +91,6 @@ impl Tile {
 
             // todo: ?????
             // unique.insert(tile_ref.get_id(), tile_ref);
-
-            trace!("{}: {:?}", tile.get_id(), tile.neighbors);
         }
 
         let output = unique.values().cloned().collect::<Vec<Self>>();
@@ -139,16 +130,11 @@ impl Tile {
             neighbors: Default::default(),
         }
     }
-
-    /// Prevent us from calculating the hash all the
-    ///   time and make it easier to pass around
-    pub fn get_id(&self) -> u64 {
-        self.id
-    }
 }
 
 pub trait Collapsable {
     fn test(&self, neighbors: &HashMap<Direction, Vec<u64>>) -> bool;
+    fn get_id(&self) -> u64;
 }
 
 impl Collapsable for Tile {
@@ -171,6 +157,10 @@ impl Collapsable for Tile {
 
         true
     }
+
+    fn get_id(&self) -> u64 {
+        self.id
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -185,6 +175,12 @@ impl<T> SuperState<T>
 where
     T: Collapsable,
 {
+    pub(crate) fn new(possible: Vec<Rc<T>>) -> Self {
+        Self {
+            possible,
+        }
+    }
+
     pub fn entropy(&self) -> usize {
         self.possible.len()
     }
@@ -196,7 +192,7 @@ where
         }
     }
 
-    pub fn collapse(&mut self, rng: &mut ThreadRng) {
+    pub fn collapse(&mut self, rng: &mut StdRng) {
         if self.entropy() > 1 {
             self.possible = vec![self.possible.choose(rng).unwrap().clone()];
         }
@@ -205,8 +201,6 @@ where
     pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<u64>>) {
         if neighbors.len() > 0 && self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
-
-            // assert!(self.entropy() > 0);
         }
     }
 }
