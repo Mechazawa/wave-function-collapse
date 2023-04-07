@@ -181,14 +181,8 @@ impl Collapsable for Tile {
         assert!(self.neighbors.len() > 0);
 
         for (direction, tiles) in neighbors {
-            let possible = match self.neighbors.get(direction) {
-                Some(v) => v,
-                None => {
-                    valid += 1; // todo hack, this is wrong
-                    continue;
-                }
-            };
-
+            let possible = self.neighbors.get(direction).expect(format!("Missing neighbor {:?}", direction).as_str());
+            
             for tile in tiles {
                 if possible.contains_key(&tile.get_id()) {
                     valid += 1;
