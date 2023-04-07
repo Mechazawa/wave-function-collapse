@@ -18,6 +18,7 @@ where
     stack: Vec<Position>,
     collapse_stack: Vec<CollapsedItem>,
     base: Grid<SuperState<T>>,
+    ticks: u32,
 }
 
 impl<T> WaveFuncCollapse<T>
@@ -42,6 +43,7 @@ where
             stack,
             rng,
             collapse_stack: Vec::new(),
+            ticks: 0,
         }
     }
 
@@ -54,22 +56,28 @@ where
     }
 
     pub fn tick(&mut self) {
+        self.ticks += 1;
+
         // todo: optimise to only test positions near collapsed
-        // test all positions
+        // test all positions        
         for &(x, y) in &self.stack {
             let mut neighbors: Neighbors<Vec<u64>> = Default::default();
+            let mut do_test: bool = false;
 
             for (direction, maybe_cell) in self.grid.get_neighbors(x, y) {
                 if let Some(cell) = maybe_cell {
                     let base_entropy = self.base.get(x, y).unwrap().entropy();
 
                     if cell.entropy() < base_entropy {
+                        do_test = true;
                         neighbors[direction] = cell.possible.iter().map(|t| t.get_id()).collect();
                     }
                 }
             }
 
-            self.grid.get_mut(x, y).unwrap().tick(&neighbors);
+            // if do_test {
+                self.grid.get_mut(x, y).unwrap().tick(self.ticks, &neighbors);
+            // }
         }
 
         let mut stack_next = Vec::new();
@@ -97,6 +105,14 @@ where
         }
     }
 
+    pub fn new_base(&self, x: usize, y: usize) -> SuperState<T> {
+        let mut base_state = self.base.get(x, y).unwrap().clone();
+
+        base_state.last_tick = self.ticks;
+
+        base_state        
+    }
+
     pub fn rollback(&mut self) {
         loop {
             let (lx, ly, implicit) = match self.collapse_stack.pop() {
@@ -104,9 +120,8 @@ where
                 Some(v) => v,
             };
 
-            let base_state = self.base.get(lx, ly).unwrap().clone();
 
-            self.grid.set(lx, ly, base_state).unwrap();
+            self.grid.set(lx, ly, self.new_base(lx, ly)).unwrap();
 
             self.stack.push((lx, ly));
 
@@ -117,9 +132,7 @@ where
 
         // reset the entropy for other tiles
         for &(x, y) in &self.stack {
-            let base_state = self.base.get(x, y).unwrap().clone();
-
-            self.grid.set(x, y, base_state).unwrap();
+            self.grid.set(x, y, self.new_base(x, y)).unwrap();
         }
 
         // sort the stack again
