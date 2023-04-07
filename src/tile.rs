@@ -1,8 +1,7 @@
-use crate::grid::Grid;
+use crate::grid::{Grid, Neighbors};
 use crate::wfc::{Collapsable};
 use crate::sprite::Sprite;
 use crate::grid::Size;
-use crate::grid::Direction;
 use image::{DynamicImage, ImageBuffer};
 use image::GenericImageView;
 use log::debug;
@@ -17,7 +16,7 @@ use std::hash::Hash;
 pub struct Tile {
     pub sprite: Rc<Sprite>,
     /// todo: neighbours per side
-    pub neighbors: HashMap<Direction, HashSet<u64>>,
+    pub neighbors: Neighbors<HashSet<u64>>,
 
     id: u64,
 }
@@ -52,12 +51,12 @@ impl Tile {
 
             for (direction, value) in grid.get_neighbors(x, y) {
                 tile.neighbors
-                    .entry(direction)
-                    .or_insert_with(HashSet::new)
+                    .get_or_default(direction)
+                    .unwrap()
                     .insert(*value);
             }
 
-            assert!(tile.neighbors.len() > 0);
+            assert!(tile.neighbors.count() > 0);
 
             // todo: ?????
             // unique.insert(tile_ref.get_id(), tile_ref);
@@ -66,7 +65,7 @@ impl Tile {
         let output = unique.values().cloned().collect::<Vec<Self>>();
 
         for tile in output.iter() {
-            assert!(tile.neighbors.len() > 0);
+            assert!(tile.neighbors.count() > 0);
         }
 
         // todo: Keep track of rotation
@@ -91,8 +90,9 @@ impl Tile {
 }
 
 impl Collapsable for Tile {
-    fn test(&self, neighbors: &HashMap<Direction, Vec<u64>>) -> bool {
-        for (direction, tiles) in neighbors {
+    fn test(&self, neighbors: &Neighbors<Vec<u64>>) -> bool {
+        for direction in neighbors.list() {
+            let tiles = neighbors.get(direction).unwrap();
             let possible = self.neighbors.get(direction).expect("Missing neighbor");
 
             let mut found = false;

@@ -1,11 +1,11 @@
-use crate::grid::Direction;
+use crate::grid::{Direction, Neighbors};
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub trait Collapsable {
-    fn test(&self, neighbors: &HashMap<Direction, Vec<u64>>) -> bool;
+    fn test(&self, neighbors: &Neighbors<Vec<u64>>) -> bool;
     fn get_id(&self) -> u64;
 }
 
@@ -42,8 +42,8 @@ where
         }
     }
 
-    pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<u64>>) {
-        if neighbors.len() > 0 && self.entropy() > 1 {
+    pub fn tick(&mut self, neighbors: &Neighbors<Vec<u64>>) {
+        if neighbors.is_empty() == false && self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
         }
     }
