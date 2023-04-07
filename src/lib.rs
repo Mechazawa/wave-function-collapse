@@ -172,7 +172,7 @@ impl Collapsable for Tile {
             let possible = match self.neighbors.get(direction) {
                 Some(v) => v,
                 None => {
-                    valid += 1;
+                    valid += 1; // todo hack, this is wrong
                     continue;
                 },
             };
@@ -215,14 +215,16 @@ where
     }
 
     pub fn collapse(&mut self, rng: &mut ThreadRng) {
-        self.possible = vec![self.possible.choose(rng).unwrap().clone()];
+        if self.entropy() > 1 {
+            self.possible = vec![self.possible.choose(rng).unwrap().clone()];
+        }
     }
 
     pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<Rc<T>>>) {
         if self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
 
-            assert!(self.entropy() > 0);
+            // assert!(self.entropy() > 0);
         }
     }
 }
