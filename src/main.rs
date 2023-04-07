@@ -111,6 +111,7 @@ fn main() {
     let tile_height = image_height / opt.input_size.height;
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+    let mut collapse_stack: Vec<(usize, bool)> = vec![];
 
     {
         // todo: it always starts in left-bottom??
@@ -156,20 +157,47 @@ fn main() {
         }
 
         // sort the stack; entropy ascending
-        stack.sort_by(|a, b| grid[*b].entropy().cmp(&grid[*a].entropy()));
+        stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
 
-        // collapse lowest entropy
-        stack.retain(|v| grid[*v].entropy() > 1);
-
-        if let Some(top) = stack.pop() {
-            grid[top].collapse(&mut rng);
+        for id in &stack {
+            if grid[*id].collapsed().is_some() {
+                collapse_stack.push((*id, true));
+            }
         }
 
-        stack.reverse();
+        // collapse lowest entropy
+        stack.retain(|v| grid[*v].collapsed().is_none());
+
+        if let Some(&lowest) = &stack.get(0) {
+            if grid[lowest].entropy() == 0 {
+                loop {
+                    let (last, implicit) = collapse_stack.pop().unwrap();
+
+                    grid[last] = base_state.clone();
+
+                    stack.push(last);
+
+                    if implicit == false {
+                        break;
+                    }
+                }
+
+                // reset the entropy for other tiles
+                for &id in &stack {
+                    grid[id] = base_state.clone();
+                }
+
+                // sort the stack again
+                stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
+
+                warn!("Backtracking");
+            } else {
+                grid[lowest].collapse(&mut rng);
+                collapse_stack.push((lowest, false));
+            }
+        }
 
         // draw
-        // todo only draw recently collapsed
-        // todo broken :(
         let mut canvas = RgbaImage::new(
             opt.output_size.width * tile_width,
             opt.output_size.height * tile_height,
@@ -180,8 +208,6 @@ fn main() {
             let y = (index as u32) / opt.output_size.width;
 
             if let Some(t) = grid[index].collapsed() {
-                trace!("draw I {}, {} => {}", x, y, t.get_id());
-
                 image::imageops::overlay(
                     &mut canvas,
                     &t.sprite.image,
@@ -189,8 +215,6 @@ fn main() {
                     (y * tile_height) as i64,
                 );
             } else {
-                trace!("draw E {}, {}", x, y);
-
                 let scale = Scale::uniform(6.0);
                 let color = Rgba([255, 0, 0, 255]); // red
                 let text = format!("{}", grid[index].entropy());
