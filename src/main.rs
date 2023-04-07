@@ -82,7 +82,7 @@ struct Opt {
         parse(try_from_str),
         short,
         long,
-        required_if("input-type", "config"),
+        required_if("input", "config"),
         help = "Input image grid size"
     )]
     input_size: Option<Size>,
