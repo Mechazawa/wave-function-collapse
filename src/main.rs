@@ -1,5 +1,7 @@
 mod grid;
 mod wfc;
+mod tile;
+mod sprite;
 
 use image::GenericImageView;
 use image::Rgba;
@@ -25,9 +27,9 @@ use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
 use grid::Direction;
-use wfc::Size;
+use grid::Size;
 use wfc::SuperState;
-use wfc::Tile;
+use tile::Tile;
 
 use crate::grid::Grid;
 use crate::wfc::Collapsable;
