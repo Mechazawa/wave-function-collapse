@@ -1,4 +1,4 @@
-use crate::grid::{Grid, Neighbors};
+use crate::grid::{Grid, Neighbors, Direction};
 use crate::wfc::{Collapsable};
 use crate::sprite::Sprite;
 use crate::grid::Size;
@@ -6,7 +6,6 @@ use image::{DynamicImage, ImageBuffer};
 use image::GenericImageView;
 use log::debug;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::rc::Rc;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
@@ -16,7 +15,7 @@ use std::hash::Hash;
 pub struct Tile {
     pub sprite: Rc<Sprite>,
     /// todo: neighbours per side
-    pub neighbors: Neighbors<HashSet<u64>>,
+    pub neighbors: Neighbors<Vec<u64>>,
 
     id: u64,
 }
@@ -51,7 +50,11 @@ impl Tile {
 
             for (direction, maybe) in grid.get_neighbors(x, y) {
                 if let Some(value) = maybe {
-                    tile.neighbors[direction].insert(*value);
+                    if !tile.neighbors[direction].contains(value) {
+                        tile.neighbors[direction].push(*value);
+                        tile.neighbors[direction].sort_unstable();
+                        assert!(tile.neighbors[direction].len() > 0);
+                    }
                 }
             }
 
@@ -61,7 +64,7 @@ impl Tile {
             // unique.insert(tile_ref.get_id(), tile_ref);
         }
 
-        let output = unique.values().cloned().collect::<Vec<Self>>();
+        let output: Vec<Self> = unique.values().cloned().collect::<Vec<Self>>();
 
         for tile in output.iter() {
             assert!(tile.neighbors.len() > 0);
@@ -91,14 +94,17 @@ impl Tile {
 impl Collapsable for Tile {
     fn test(&self, neighbors: &Neighbors<Vec<u64>>) -> bool {
         for (direction, tiles) in neighbors {
+            if tiles.len() == 0 {
+                continue
+            }
+
             let possible = &self.neighbors[direction];
 
             let mut found = false;
 
-            for tile in tiles {
-                if possible.contains(tile) {
+            for index in 0..tiles.len() {
+                if possible.contains(&tiles[index]) {
                     found = true;
-                    dbg!(found);
                 }
             }
 
