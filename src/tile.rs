@@ -62,7 +62,7 @@ impl Tile {
                 for (direction, key) in neighbors {
                     let rev_key: String = slots[index].1[direction.invert()].chars().rev().collect();
 
-                    if key == &rev_key {
+                    if *key == rev_key {
                         output[index].neighbors[direction].push(*id);
                     }
                 }
