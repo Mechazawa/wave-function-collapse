@@ -2,12 +2,15 @@ mod lib;
 
 use image::{ImageError, GenericImageView};
 use image::{io::Reader as ImageReader, DynamicImage};
-use log::debug;
+use log::{debug, info};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
+
+use lib::Tile;
+use lib::Size;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -48,9 +51,6 @@ struct Opt {
         help = "Output image grid size"
     )]
     output_size: Size,
-
-    #[structopt(short, long)]
-    rotate: bool,
 }
 
 fn main() {
@@ -66,5 +66,7 @@ fn main() {
 
     debug!("{:?}", opt);
 
-    opt.input.view(0, 0, 10, 10);
+    let tiles = Tile::get_tile_set(&opt.input, &opt.input_size);
+
+    info!("{} unique tiles found", tiles.len());
 }
