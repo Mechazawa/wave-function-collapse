@@ -1,5 +1,5 @@
-use crate::grid::{Grid, Neighbors, Direction};
-use crate::wfc::{Collapsable};
+use crate::grid::{Grid, Neighbors};
+use crate::superstate::{Collapsable};
 use crate::sprite::Sprite;
 use crate::grid::Size;
 use image::{DynamicImage, ImageBuffer};
