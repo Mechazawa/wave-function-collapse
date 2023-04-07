@@ -68,8 +68,8 @@ impl Tile {
         let mut unique: HashMap<u64, Self> = Default::default();
 
         debug!("Generating tiles");
-        let mut grid = Grid::new(grid_size.width, grid_size.height, |x, y| {
-            let view = image.view(x * tile_width, y * tile_height, tile_width, tile_height);
+        let mut grid = Grid::new(grid_size.width as usize, grid_size.height as usize, |x, y| {
+            let view = image.view(x as u32 * tile_width, y as u32 * tile_height, tile_width, tile_height);
 
             let buffer =
                 ImageBuffer::from_fn(tile_width, tile_height, |ix, iy| view.get_pixel(ix, iy));
