@@ -4,11 +4,11 @@ use image::ImageBuffer;
 use image::Pixel;
 use log::debug;
 use num_traits::cast::ToPrimitive;
-use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::str::FromStr;
-use std::collections::hash_map::DefaultHasher;
 
 #[derive(Debug)]
 pub struct Size {
@@ -33,20 +33,32 @@ impl FromStr for Size {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
 #[derive(Debug, Clone)]
 pub struct Tile<T>
 where
     T: GenericImageView,
 {
-    image: T,
+    image: Rc<T>,
     /// todo: neighbours per side
-    neighbors: HashSet<Rc<Tile<T>>>,
+    neighbors: HashMap<Direction, HashSet<Rc<Tile<T>>>>,
 }
 
 impl<T> Tile<T>
 where
     T: GenericImageView,
-    DynamicImage: From<ImageBuffer<<T as GenericImageView>::Pixel, Vec<<<T as GenericImageView>::Pixel as Pixel>::Subpixel>>>,
+    DynamicImage: From<
+        ImageBuffer<
+            <T as GenericImageView>::Pixel,
+            Vec<<<T as GenericImageView>::Pixel as Pixel>::Subpixel>,
+        >,
+    >,
 {
     pub fn get_tile_set(image: &T, grid_size: &Size) -> HashSet<Rc<Tile<DynamicImage>>> {
         let (image_width, image_height) = image.dimensions();
@@ -56,22 +68,18 @@ where
         let mut output: HashSet<Rc<Tile<DynamicImage>>> = HashSet::new();
         let mut grid: Vec<Rc<Tile<DynamicImage>>> = Vec::new();
 
-        debug!("Generating tiles...");
-    
+        debug!("Generating tiles");
+
         for y in 0..grid_size.height {
             for x in 0..grid_size.width {
-                let view = image.view(
-                    x * tile_width,
-                    y * tile_height,
-                    tile_width,
-                    tile_height,
-                );
+                let view = image.view(x * tile_width, y * tile_height, tile_width, tile_height);
 
-                let buffer = ImageBuffer::from_fn(tile_width, tile_height, |x, y| view.get_pixel(x, y));
+                let buffer =
+                    ImageBuffer::from_fn(tile_width, tile_height, |x, y| view.get_pixel(x, y));
 
                 let new_tile = Rc::new(Tile {
-                    image: DynamicImage::from(buffer),
-                    neighbors: HashSet::new(),
+                    image: Rc::new(DynamicImage::from(buffer)),
+                    neighbors: HashMap::new(),
                 });
 
                 output.insert(Rc::clone(&new_tile));
@@ -84,23 +92,30 @@ where
 
         debug!("Populating neighbors");
 
-        let offsets: &[i32] = &[-1, 1, -(grid_size.width as i32), grid_size.width as i32];
+        let offsets = [
+            (Direction::Left, -1), 
+            (Direction::Right, 1), 
+            (Direction::Up, -(grid_size.width as i32)), 
+            (Direction::Down, grid_size.width as i32)
+        ];
 
         for index in 0..grid.len() {
             let mut tile_ref = Rc::clone(&grid[index]);
-            
-            for offset in offsets {
+
+            for (direction, offset) in offsets {
                 let target = index as i32 + offset;
 
                 if target >= 0 {
                     if let Some(value) = grid.get(target as usize) {
                         let tile = Rc::make_mut(&mut tile_ref);
 
-                        tile.neighbors.insert(Rc::clone(&value));
+                        tile.neighbors.entry(direction).or_insert_with(HashSet::new).insert(Rc::clone(&value));
                     }
                 }
             }
         }
+
+        // todo: Keep track of rotation
 
         output
     }

@@ -64,8 +64,6 @@ fn main() {
     )
     .unwrap();
 
-    debug!("{:?}", opt);
-
     let tiles = Tile::get_tile_set(&opt.input, &opt.input_size);
 
     info!("{} unique tiles found", tiles.len());
