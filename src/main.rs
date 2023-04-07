@@ -1,7 +1,7 @@
 mod grid;
-mod wfc;
-mod tile;
 mod sprite;
+mod tile;
+mod wfc;
 
 use image::GenericImageView;
 use image::Rgba;
@@ -11,14 +11,13 @@ use imageproc::drawing::draw_text_mut;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use log::debug;
-use log::warn;
 use log::info;
-use rand::{Rng, SeedableRng, rngs::StdRng};
-use rand::rngs::OsRng;
+use log::warn;
 use rand::prelude::SliceRandom;
+use rand::rngs::OsRng;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rusttype::{Font, Scale};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -26,14 +25,13 @@ use std::time::Duration;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
-use grid::Direction;
 use grid::Size;
-use wfc::SuperState;
 use tile::Tile;
+use wfc::SuperState;
+use wfc::Collapsable;
 
 use crate::grid::Grid;
 use crate::grid::Neighbors;
-use crate::wfc::Collapsable;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -96,7 +94,7 @@ fn main() {
 
     let invalid_neighbors = tiles
         .iter()
-        .map(|t| t.neighbors.count())
+        .map(|t: &Tile| t.neighbors.len())
         .filter(|c| *c != 4)
         .collect::<Vec<usize>>();
 
@@ -107,7 +105,7 @@ fn main() {
             invalid_neighbors
         );
 
-        tiles.retain(|t| t.neighbors.count() == 4);
+        tiles.retain(|t| t.neighbors.len() == 4);
 
         warn!("Retained {} tiles", tiles.len());
     }
@@ -152,11 +150,14 @@ fn main() {
     let progress = ProgressBar::new(stack.len() as u64);
 
     progress.enable_steady_tick(Duration::from_millis(200));
-    progress.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {per_sec}")
-        .unwrap()
-        .progress_chars("#>-"));
-
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {per_sec}",
+            )
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     // todo rollback when tick result is 0
     // otherwise it'll cascade
@@ -168,13 +169,12 @@ fn main() {
         // test all positions
         for &(x, y) in &stack {
             let mut neighbors: Neighbors<Vec<u64>> = Default::default();
-
-            for (direction, cell) in grid.get_neighbors(x, y) {
-                if cell.entropy() < base_state.entropy() {
-                    neighbors.set(
-                        direction,
-                        cell.possible.iter().map(|t| t.get_id()).collect(),
-                    );
+            
+            for (direction, maybe_cell) in grid.get_neighbors(x, y) {
+                if let Some(cell) = maybe_cell {
+                    // if cell.entropy() < base_state.entropy() {
+                        neighbors[direction] = cell.possible.iter().map(|t| t.get_id()).collect();
+                    // }
                 }
             }
 
@@ -206,6 +206,7 @@ fn main() {
 
         if let Some(&(x, y)) = stack.get(0) {
             if grid.get(x, y).unwrap().entropy() == 0 {
+                warn!("Backtracking");
                 loop {
                     let (lx, ly, implicit) = match collapse_stack.pop() {
                         None => break,
@@ -233,63 +234,61 @@ fn main() {
                         .entropy()
                         .cmp(&grid.get(b.0, b.1).unwrap().entropy())
                 });
-
-                // warn!("Backtracking");
             } else {
                 grid.get_mut(x, y).unwrap().collapse(&mut rng);
                 collapse_stack.push((x, y, false));
             }
         }
-    }
 
-    let mut canvas = RgbaImage::new(
-        opt.output_size.width as u32 * tile_width,
-        opt.output_size.height as u32 * tile_height,
-    );
+        let mut canvas = RgbaImage::new(
+            opt.output_size.width as u32 * tile_width,
+            opt.output_size.height as u32 * tile_height,
+        );
 
-    for (x, y, cell) in &grid {
-        if let Some(t) = cell.collapsed() {
-            image::imageops::overlay(
-                &mut canvas,
-                &t.sprite.image,
-                x as i64 * tile_width as i64,
-                y as i64 * tile_height as i64,
-            );
-        } else {
-            let scale = Scale::uniform(8.0);
-            let color = Rgba([255, 0, 0, 255]); // red
-            let text = format!("{}", cell.entropy());
+        for (x, y, cell) in &grid {
+            if let Some(t) = cell.collapsed() {
+                image::imageops::overlay(
+                    &mut canvas,
+                    &t.sprite.image,
+                    x as i64 * tile_width as i64,
+                    y as i64 * tile_height as i64,
+                );
+            } else {
+                let scale = Scale::uniform(8.0);
+                let color = Rgba([255, 0, 0, 255]); // red
+                let text = format!("{}", cell.entropy());
 
-            draw_text_mut(
-                &mut canvas,
-                color,
-                x as i32 * tile_width as i32,
-                y as i32 * tile_height as i32,
-                scale,
-                &font,
-                &text,
-            );
+                draw_text_mut(
+                    &mut canvas,
+                    color,
+                    x as i32 * tile_width as i32,
+                    y as i32 * tile_height as i32,
+                    scale,
+                    &font,
+                    &text,
+                );
+            }
         }
-    }
 
-    // draw
-    // todo temporary for making animation
-    let file_name: String = opt
-        .output
-        .as_path()
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .into();
+        // draw
+        // todo temporary for making animation
+        let file_name: String = opt
+            .output
+            .as_path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into();
 
-    if file_name.contains("{}") {
-        let mut path = opt.output.clone();
-        let new_name = file_name.replace("{}", format!("{:05}", stack.len()).as_str());
+        if file_name.contains("{}") {
+            let mut path = opt.output.clone();
+            let new_name = file_name.replace("{}", format!("{:05}", stack.len()).as_str());
 
-        path.set_file_name(new_name);
+            path.set_file_name(new_name);
 
-        canvas.save(path).unwrap();
-    } else {
-        canvas.save(opt.output.as_path()).unwrap();
+            canvas.save(path).unwrap();
+        } else {
+            canvas.save(opt.output.as_path()).unwrap();
+        }
     }
 }

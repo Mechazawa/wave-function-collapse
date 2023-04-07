@@ -1,7 +1,9 @@
 use core::str::FromStr;
 
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+use enum_map::{Enum, EnumMap, enum_map};
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]
 pub enum Direction {
     Up,
     Down,
@@ -9,91 +11,7 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct Neighbors<T> {
-    pub up: Option<T>,
-    pub down: Option<T>,
-    pub left: Option<T>,
-    pub right: Option<T>,
-}
-
-impl<T> Neighbors<T> {
-    pub fn get(&mut self, direction: Direction) -> Option<&mut T> {
-        let value = match direction {
-            Direction::Up => &mut self.up,
-            Direction::Down => &mut self.down,
-            Direction::Left => &mut self.left,
-            Direction::Right => &mut self.right,
-        };
-
-        match value {
-            None => None,
-            Some(v) => Some(v),
-        }
-    }
-
-    pub fn set(&mut self, direction: Direction, value: T) {
-        match direction {
-            Direction::Up => { self.up = Some(value); },
-            Direction::Down => { self.down = Some(value); },
-            Direction::Left => { self.left = Some(value); },
-            Direction::Right => { self.right = Some(value); },
-        }; 
-    }
-
-    pub fn delete(&mut self, direction: Direction) {
-        match direction {
-            Direction::Up => { self.up = None; },
-            Direction::Down => { self.down = None; },
-            Direction::Left => { self.left = None; },
-            Direction::Right => { self.right = None; },
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.up.is_none() && 
-        self.down.is_none() && 
-        self.left.is_none() && 
-        self.right.is_none()
-    }
-
-    pub fn count(&self) -> usize {
-        let mut output = 0;
-        
-        if self.up.is_some() { output += 1; }
-        if self.down.is_some() { output += 1; }
-        if self.left.is_some() { output += 1; }
-        if self.right.is_some() { output += 1; }
-        
-        output
-    }
-
-    pub fn list(&self) -> Vec<Direction> {
-        let mut output = vec![];
-        
-        if self.up.is_some() { output.push(Direction::Up); }
-        if self.down.is_some() { output.push(Direction::Down); }
-        if self.left.is_some() { output.push(Direction::Left); }
-        if self.right.is_some() { output.push(Direction::Right); }
-        
-        output
-    }
-}
-
-impl<T: std::default::Default> Neighbors<T> {
-    pub fn get_or_default(&mut self, direction: Direction) -> Option<&mut T> {
-        let output = self.get(direction);
-
-        match output {
-            Some(value) => Some(value),
-            None => {
-                self.set(direction, Default::default());
-                self.get(direction)
-            }
-        }
-    }
-}
-    
+pub type Neighbors<T> = EnumMap<Direction, T>;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Size {
@@ -178,21 +96,13 @@ impl<T> Grid<T> {
         Ok(())
     }
 
-    pub fn get_neighbors(&self, x: usize, y: usize) -> Vec<(Direction, &T)> {
-        let mut output = Vec::with_capacity(4);
-
-        for direction in [
-            Direction::Up,
-            Direction::Down,
-            Direction::Left,
-            Direction::Right,
-        ] {
-            if let Some(value) = self.get_neighbor(x, y, direction) {
-                output.push((direction, value));
-            }
+    pub fn get_neighbors(&self, x: usize, y: usize) -> Neighbors<Option<&T>> {
+        enum_map! {
+            Direction::Up => self.get_neighbor(x, y, Direction::Up),
+            Direction::Down => self.get_neighbor(x, y, Direction::Down),
+            Direction::Left => self.get_neighbor(x, y, Direction::Left),
+            Direction::Right => self.get_neighbor(x, y, Direction::Right),
         }
-
-        output
     }
 
     pub fn get_neighbor(&self, x: usize, y: usize, direction: Direction) -> Option<&T> {
