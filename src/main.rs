@@ -260,7 +260,7 @@ fn main() {
         .into();
 
     if file_name.contains("{}") {
-        let mut path = file_path.to_path_buf();
+        let mut path = file_path;
         let new_name = file_name.replace("{}", format!("{:05}", wfc.remaining()).as_str());
 
         path.set_file_name(new_name);

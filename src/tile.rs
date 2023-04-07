@@ -164,8 +164,8 @@ impl<T> Collapsable for Tile<T> {
 
             let mut found = false;
 
-            for index in 0..tiles.len() {
-                if possible.contains(&tiles[index]) {
+            for tile in tiles {
+                if possible.contains(tile) {
                     found = true;
                 }
             }
