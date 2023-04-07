@@ -48,7 +48,7 @@ where
     }
 
     pub fn done(&self) -> bool {
-        self.stack.len() == 0
+        self.stack.is_empty()
     }
 
     pub fn remaining(&self) -> usize {
@@ -96,7 +96,7 @@ where
         self.sort();
 
         // Either rollback if lowest entropy is zero or collapse it.
-        if let Some(&(x, y)) = self.stack.get(0) {
+        if let Some(&(x, y)) = self.stack.first() {
             if self.grid.get(x, y).unwrap().entropy() == 0 {
                 self.rollback();
             } else {
@@ -128,7 +128,7 @@ where
 
             self.stack.push((lx, ly));
 
-            if implicit == false {
+            if !implicit {
                 break;
             }
         }

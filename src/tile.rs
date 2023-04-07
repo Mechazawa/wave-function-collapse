@@ -80,7 +80,7 @@ impl Tile {
         let mut unique: HashMap<u64, Self> = Default::default();
 
         debug!("Generating tiles");
-        let grid = Grid::new(grid_size.width as usize, grid_size.height as usize, &mut |x, y| {
+        let grid = Grid::new(grid_size.width, grid_size.height, &mut |x, y| {
             let view = image.view(x as u32 * tile_width, y as u32 * tile_height, tile_width, tile_height);
 
             let buffer =
@@ -97,14 +97,14 @@ impl Tile {
         debug!("Populating neighbors");
 
         for (x, y, tile_id) in &grid {
-            let tile = unique.get_mut(&tile_id).unwrap();
+            let tile = unique.get_mut(tile_id).unwrap();
 
             for (direction, maybe) in grid.get_neighbors(x, y) {
                 if let Some(value) = maybe {
                     if !tile.neighbors[direction].contains(value) {
                         tile.neighbors[direction].push(*value);
                         tile.neighbors[direction].sort_unstable();
-                        assert!(tile.neighbors[direction].len() > 0);
+                        assert!(!tile.neighbors[direction].is_empty());
                     }
                 }
             }
@@ -144,7 +144,7 @@ impl Collapsable for Tile {
 
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool {
         for (direction, tiles) in neighbors {
-            if tiles.len() == 0 {
+            if tiles.is_empty() {
                 continue
             }
 

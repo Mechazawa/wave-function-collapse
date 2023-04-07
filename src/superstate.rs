@@ -49,7 +49,7 @@ where
         let entropy = self.entropy();
 
         if neighbors.len() > 0 && entropy > 1 {
-            self.possible.retain(|v| v.test(&neighbors));
+            self.possible.retain(|v| v.test(neighbors));
 
             if entropy != self.entropy() {
                 self.last_tick = tick;
