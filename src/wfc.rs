@@ -20,6 +20,9 @@ where
     base: Grid<SuperState<T>>,
     ticks: u32,
     rollbacks: u16,
+
+    old_stack_len: usize,
+    old_collapse_stack_len: usize,
 }
 
 impl<T> WaveFuncCollapse<T>
@@ -82,6 +85,9 @@ where
     }
 
     pub fn tick(&mut self) {
+        self.old_stack_len = self.stack.len();
+        self.old_collapse_stack_len = self.collapse_stack.len();
+
         self.ticks += 1;
 
         for (x, y) in self.stack.clone() {
@@ -211,4 +217,17 @@ where
                 .cmp(&self.grid.get(b.0, b.1).unwrap().entropy())
         });
     }
+
+    pub fn get_updated(&self) {
+        // before doing tick store lengths of both stacks (done)
+        // use what is new to build a list of {x,y,value:(Entropy(usize)|Collapsed(T))}
+        // return that
+
+        todo!();
+    }
+
+    // enum Updated {
+    //     Entropy(usize), 
+    //     Collapsed(T)
+    // }
 }
