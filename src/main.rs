@@ -25,6 +25,8 @@ use std::rc::Rc;
 use std::time::Duration;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
+use structopt::clap::Shell;
+use std::io;
 
 use grid::Size;
 use superstate::SuperState;
@@ -67,6 +69,30 @@ enum Input {
 }
 
 #[derive(Debug, StructOpt)]
+struct DisplayOpt {
+    #[structopt(
+        short="V",
+        long,
+        help = "Open a window to show the generation"
+    )]
+    visual: bool,
+
+    #[structopt(
+        short="e",
+        long,
+        help = "Show entropy values in visualisation"
+    )]
+    visual_entropy: bool,
+
+    #[structopt(
+        short,
+        long,
+        help = "Limit frames per second"
+    )]
+    fps: Option<u16>,
+}
+
+#[derive(Debug, StructOpt)]
 #[structopt(
     name = "Wave Function Collapse",
     about = "Generate images using wfc from input images"
@@ -75,8 +101,8 @@ struct Opt {
     #[structopt(flatten)]
     verbose: QuietVerbose,
 
-    #[structopt(parse(try_from_str=load_input), help = "Input")]
-    input: Input,
+    #[structopt(parse(try_from_str=load_input), help = "Input", required_unless="completions")]
+    input: Option<Input>,
 
     #[structopt(
         parse(try_from_str),
@@ -87,8 +113,8 @@ struct Opt {
     )]
     input_size: Option<Size>,
 
-    #[structopt(parse(from_os_str), help = "Output image")]
-    output: PathBuf,
+    #[structopt(parse(from_os_str), help = "Output image", required_unless="completions")]
+    output: Option<PathBuf>,
 
     #[structopt(
         parse(try_from_str),
@@ -102,24 +128,21 @@ struct Opt {
     #[structopt(parse(try_from_str), short, long, help = "Random seed (unstable)")]
     seed: Option<u64>,
 
-    #[structopt(
-        short,
-        long,
-        help = "Open a window to show the generation"
-    )]
-    visual: bool,
+    #[structopt(flatten)]
+    display: DisplayOpt,
 
-    #[structopt(
-        short,
-        long,
-        help = "Show entropy values in visualisation"
-    )]
-    visual_entropy: bool,
+    #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]    
+    completions: Option<Shell>,
 }
 
 #[cfg(feature = "image")]
 fn main() {
     let opt: Opt = Opt::from_args();
+
+    if let Some(shell) = opt.completions {
+        Opt::clap().gen_completions_to(env!("CARGO_PKG_NAME"), shell, &mut io::stdout());
+        return;
+    }
 
     TermLogger::init(
         opt.verbose.get_level_filter(),
@@ -129,7 +152,7 @@ fn main() {
     )
     .unwrap();
 
-    let mut tiles = match &opt.input {
+    let mut tiles = match &opt.input.unwrap() {
         Input::Image(value) => Tile::from_image(value, &opt.input_size.unwrap()),
         Input::Config(value) => Tile::from_config(value),
     };
@@ -228,8 +251,8 @@ fn main() {
 
     // draw
     // todo temporary for making animation
-    let file_name: String = opt
-        .output
+    let file_path = opt.output.unwrap();
+    let file_name: String = file_path
         .as_path()
         .file_name()
         .unwrap()
@@ -237,13 +260,13 @@ fn main() {
         .into();
 
     if file_name.contains("{}") {
-        let mut path = opt.output;
+        let mut path = file_path.to_path_buf();
         let new_name = file_name.replace("{}", format!("{:05}", wfc.remaining()).as_str());
 
         path.set_file_name(new_name);
 
         canvas.save(path).unwrap();
     } else {
-        canvas.save(opt.output.as_path()).unwrap();
+        canvas.save(file_path.as_path()).unwrap();
     }
 }
