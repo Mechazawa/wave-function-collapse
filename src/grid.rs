@@ -152,6 +152,14 @@ where T: Clone {
 
         self.get(x, y)
     }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
 }
 
 impl<'a, T> IntoIterator for &'a Grid<T>

@@ -58,32 +58,34 @@ where
         self.stack.len()
     }
 
+    fn tick_cell(&mut self, x: usize, y: usize, force: bool) {
+        let mut neighbors: Neighbors<Vec<T::Identifier>> = Default::default();
+        let mut do_test: bool = force;
+
+        for (direction, maybe_cell) in self.grid.get_neighbors(x, y) {
+            if let Some(cell) = maybe_cell {
+                let base_entropy = self.base.get(x, y).unwrap().entropy();
+
+                if cell.entropy() < base_entropy {
+                    do_test = do_test || cell.last_tick >= self.ticks - 1;
+                    neighbors[direction] = cell.possible.iter().map(|t| t.get_id()).collect();
+                }
+            }
+        }
+
+        if do_test {
+            self.grid
+                .get_mut(x, y)
+                .unwrap()
+                .tick(self.ticks, &neighbors);
+        }
+    }
+
     pub fn tick(&mut self) {
         self.ticks += 1;
 
-        // todo: optimise to only consider near previously changed, fixes large grid performance
-        // test all positions
-        for &(x, y) in &self.stack {
-            let mut neighbors: Neighbors<Vec<T::Identifier>> = Default::default();
-            let mut do_test: bool = false;
-
-            for (direction, maybe_cell) in self.grid.get_neighbors(x, y) {
-                if let Some(cell) = maybe_cell {
-                    let base_entropy = self.base.get(x, y).unwrap().entropy();
-
-                    if cell.entropy() < base_entropy {
-                        do_test = do_test || cell.last_tick >= self.ticks - 1;
-                        neighbors[direction] = cell.possible.iter().map(|t| t.get_id()).collect();
-                    }
-                }
-            }
-
-            if do_test {
-                self.grid
-                    .get_mut(x, y)
-                    .unwrap()
-                    .tick(self.ticks, &neighbors);
-            }
+        for (x, y) in self.stack.clone() {
+            self.tick_cell(x, y, false);
         }
 
         self.stack
@@ -96,10 +98,12 @@ where
             });
 
         // sort the stack; entropy ascending
-        self.sort();
+        self.fixup();
 
         // Either rollback if lowest entropy is zero or collapse it.
         if let Some(&(x, y)) = self.stack.first() {
+            self.tick_cell(x, y, true);
+
             if self.grid.get(x, y).unwrap().entropy() == 0 {
                 self.collapse_stack.push((x, y, true));
                 self.rollback();
@@ -135,22 +139,31 @@ where
         self.collapse_stack = Vec::with_capacity(self.stack.len());
         self.rollbacks = 0;
 
+        self.fixup();
+
         assert!(self.stack.len() <= self.grid.size());
+
+        // reset the entropy for other tiles
+        for &(x, y) in &self.stack {
+            self.grid.set(x, y, self.new_base(x, y)).unwrap();
+        }
     }
 
     pub fn rollback(&mut self) {
         self.rollbacks += 5;
 
-        let mut steps = 1 + (self.rollbacks / 100);
+        let mut steps = 3 + (self.rollbacks / 100);
 
         if steps > 1 {
-            trace!("Rollback score: {}, steps: {steps}", self.rollbacks);
+            trace!("Rollback score: {}, steps: {}, stack sizes: ({}, {})", self.rollbacks, steps, self.stack.len(), self.collapse_stack.len());
         }
 
-        if steps > 5 {
+        if steps > 10 {
             warn!("Lockup detected, resetting...");
             
             self.reset();
+
+            return;
         }
 
         loop {
@@ -159,11 +172,9 @@ where
                 Some(v) => v,
             };
 
-            self.grid.set(x, y, self.new_base(x, y)).unwrap();
-
             self.stack.push((x, y));
 
-            if implicit {
+            if !implicit {
                 steps -= 1;
             }
 
@@ -172,16 +183,26 @@ where
             }
         }
 
-        // reset the entropy for other tiles
+        // reset the entropy all tiles
         for &(x, y) in &self.stack {
-            self.grid.set(x, y, self.new_base(x, y)).unwrap();
+            if self.grid.get(x, y).unwrap().collapsing() {
+                self.grid.set(x, y, self.new_base(x, y)).unwrap();
+            }
         }
 
         // sort the stack again
-        self.sort();
+        self.fixup();
     }
 
-    fn sort(&mut self) {
+    fn fixup(&mut self) {
+        let get_index = |x,y|x + (y * self.grid.width());
+
+        self.stack.sort_by(|a, b| {
+            get_index(a.0, a.1).cmp(&get_index(b.0, b.1))
+        });
+
+        self.stack.dedup();
+
         self.stack.sort_by(|a, b| {
             self.grid
                 .get(a.0, a.1)
