@@ -2,6 +2,7 @@ mod grid;
 mod wfc;
 mod tile;
 mod sprite;
+mod enum_map;
 
 use image::GenericImageView;
 use image::Rgba;
