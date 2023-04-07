@@ -1,3 +1,4 @@
+use crate::grid::{Direction, Grid};
 use image::DynamicImage;
 use image::GenericImageView;
 use image::ImageBuffer;
@@ -24,15 +25,6 @@ impl Size {
     pub fn area(&self) -> u32 {
         self.width * self.height
     }
-
-    pub fn get_offsets(&self) -> [(Direction, i32); 4] {
-        [
-            (Direction::Left, -1),
-            (Direction::Right, 1),
-            (Direction::Up, -(self.width as i32)),
-            (Direction::Down, self.width as i32),
-        ]
-    }
 }
 
 impl FromStr for Size {
@@ -50,14 +42,6 @@ impl FromStr for Size {
 
         Ok(Size { width, height })
     }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
 }
 
 #[derive(Debug, Clone)]
@@ -82,42 +66,32 @@ impl Tile {
         let tile_height = image_height / grid_size.height;
 
         let mut unique: HashMap<u64, Self> = Default::default();
-        let mut grid: Vec<u64> = Default::default();
 
         debug!("Generating tiles");
+        let mut grid = Grid::new(grid_size.width, grid_size.height, |x, y| {
+            let view = image.view(x * tile_width, y * tile_height, tile_width, tile_height);
 
-        for y in 0..grid_size.height {
-            for x in 0..grid_size.width {
-                let view = image.view(x * tile_width, y * tile_height, tile_width, tile_height);
+            let buffer =
+                ImageBuffer::from_fn(tile_width, tile_height, |ix, iy| view.get_pixel(ix, iy));
 
-                let buffer =
-                    ImageBuffer::from_fn(tile_width, tile_height, |x, y| view.get_pixel(x, y));
+            let new_tile = Tile::new(DynamicImage::from(buffer));
+            let tile_id = new_tile.get_id();
 
-                let new_tile = Tile::new(DynamicImage::from(buffer));
-                let tile_id = new_tile.get_id();
+            unique.insert(tile_id, new_tile);
 
-                unique.insert(tile_id, new_tile);
-
-                let tile = unique.get(&tile_id).unwrap();
-
-                grid.push(tile.get_id());
-            }
-        }
+            unique.get(&tile_id).unwrap().get_id()
+        });
 
         debug!("Populating neighbors");
 
-        for index in 0..grid.len() {
-            let tile = unique.get_mut(&grid[index]).unwrap();
+        for (x, y, tile_id) in &grid {
+            let tile = unique.get(&tile_id).unwrap();
 
-            for (direction, offset) in grid_size.get_offsets() {
-                let target = index as i32 + offset;
-
-                if let Some(value) = grid.get(target as usize) {
-                    tile.neighbors
-                        .entry(direction)
-                        .or_insert_with(HashSet::new)
-                        .insert(*value);
-                }
+            for (direction, value) in grid.get_neighbors(x, y) {
+                tile.neighbors
+                    .entry(direction)
+                    .or_insert_with(HashSet::new)
+                    .insert(*value);
             }
 
             assert!(tile.neighbors.len() > 0);
