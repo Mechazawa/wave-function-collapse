@@ -92,7 +92,9 @@ impl Tile {
 }
 
 impl Collapsable for Tile {
-    fn test(&self, neighbors: &Neighbors<Vec<u64>>) -> bool {
+    type Key = u64;
+
+    fn test(&self, neighbors: &Neighbors<Vec<Self::Key>>) -> bool {
         for (direction, tiles) in neighbors {
             if tiles.len() == 0 {
                 continue
@@ -116,7 +118,7 @@ impl Collapsable for Tile {
         true
     }
 
-    fn get_id(&self) -> u64 {
+    fn get_id(&self) -> Self::Key {
         self.id
     }
 }

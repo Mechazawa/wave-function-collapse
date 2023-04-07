@@ -3,9 +3,11 @@ use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use std::rc::Rc;
 
-pub trait Collapsable {
-    fn test(&self, neighbors: &Neighbors<Vec<u64>>) -> bool;
-    fn get_id(&self) -> u64;
+pub trait Collapsable
+{
+    type Key;
+    fn test(&self, neighbors: &Neighbors<Vec<Self::Key>>) -> bool;
+    fn get_id(&self) -> Self::Key;
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +45,7 @@ where
         }
     }
 
-    pub fn tick(&mut self, tick: u32, neighbors: &Neighbors<Vec<u64>>) {
+    pub fn tick(&mut self, tick: u32, neighbors: &Neighbors<Vec<<T as Collapsable>::Key>>) {
         let entropy = self.entropy();
 
         if neighbors.len() > 0 && entropy > 1 {
