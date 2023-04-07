@@ -61,7 +61,7 @@ where
         // todo: optimise to only consider near previously changed, fixes large grid performance
         // test all positions
         for &(x, y) in &self.stack {
-            let mut neighbors: Neighbors<Vec<<T as Collapsable>::Key>> = Default::default();
+            let mut neighbors: Neighbors<Vec<T::Identifier>> = Default::default();
             let mut do_test: bool = false;
 
             for (direction, maybe_cell) in self.grid.get_neighbors(x, y) {

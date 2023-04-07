@@ -21,7 +21,7 @@ pub struct Tile {
 }
 
 impl Tile {
-    pub fn get_tile_set(image: &DynamicImage, grid_size: &Size) -> Vec<Self> {
+    pub fn from_image(image: &DynamicImage, grid_size: &Size) -> Vec<Self> {
         let (image_width, image_height) = image.dimensions();
         let tile_width = image_width / grid_size.width as u32;
         let tile_height = image_height / grid_size.height as u32;
@@ -35,7 +35,7 @@ impl Tile {
             let buffer =
                 ImageBuffer::from_fn(tile_width, tile_height, |ix, iy| view.get_pixel(ix, iy));
 
-            let new_tile = Tile::new(DynamicImage::from(buffer), Default::default());
+            let new_tile = Tile::new(DynamicImage::from(buffer));
             let tile_id = new_tile.get_id();
 
             unique.insert(tile_id, new_tile);
@@ -59,9 +59,6 @@ impl Tile {
             }
 
             assert!(tile.neighbors.len() > 0);
-
-            // todo: ?????
-            // unique.insert(tile_ref.get_id(), tile_ref);
         }
 
         let output: Vec<Self> = unique.values().cloned().collect::<Vec<Self>>();
@@ -77,7 +74,7 @@ impl Tile {
 }
 
 impl Tile {
-    pub fn new(image: DynamicImage, neighbors: Neighbors<Vec<u64>>) -> Self {
+    pub fn new(image: DynamicImage) -> Self {
         let mut hasher = DefaultHasher::new();
         let sprite = Sprite { image };
 
@@ -86,15 +83,15 @@ impl Tile {
         Self {
             id: hasher.finish(),
             sprite: Rc::new(sprite),
-            neighbors,
+            neighbors: Default::default(),
         }
     }
 }
 
 impl Collapsable for Tile {
-    type Key = u64;
+    type Identifier = u64;
 
-    fn test(&self, neighbors: &Neighbors<Vec<Self::Key>>) -> bool {
+    fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool {
         for (direction, tiles) in neighbors {
             if tiles.len() == 0 {
                 continue
@@ -118,7 +115,7 @@ impl Collapsable for Tile {
         true
     }
 
-    fn get_id(&self) -> Self::Key {
+    fn get_id(&self) -> Self::Identifier {
         self.id
     }
 }

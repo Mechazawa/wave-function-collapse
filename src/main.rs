@@ -86,7 +86,7 @@ fn main() {
     )
     .unwrap();
 
-    let mut tiles = Tile::get_tile_set(&opt.input, &opt.input_size);
+    let mut tiles = Tile::from_image(&opt.input, &opt.input_size);
 
     info!("{} unique tiles found", tiles.len());
 
