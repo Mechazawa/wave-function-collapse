@@ -101,8 +101,23 @@ struct Opt {
 
     #[structopt(parse(try_from_str), short, long, help = "Random seed (unstable)")]
     seed: Option<u64>,
+
+    #[structopt(
+        short,
+        long,
+        help = "Open a window to show the generation"
+    )]
+    visual: bool,
+
+    #[structopt(
+        short,
+        long,
+        help = "Show entropy values in visualisation"
+    )]
+    visual_entropy: bool,
 }
 
+#[cfg(feature = "image")]
 fn main() {
     let opt: Opt = Opt::from_args();
 
@@ -173,7 +188,7 @@ fn main() {
     info!("Drawing output");
 
     // drawing
-    let (tile_width, tile_height) = tiles[0].sprite.image.dimensions();
+    let (tile_width, tile_height) = tiles[0].value.image.dimensions();
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
@@ -188,7 +203,7 @@ fn main() {
         if let Some(t) = cell.collapsed() {
             image::imageops::overlay(
                 &mut canvas,
-                &t.sprite.image,
+                &t.value.image,
                 x as i64 * tile_width as i64,
                 y as i64 * tile_height as i64,
             );

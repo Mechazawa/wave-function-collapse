@@ -3,39 +3,47 @@ use crate::grid::Grid;
 use crate::grid::Neighbors;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
-use crate::sprite::Sprite;
-use image::DynamicImage;
-use image::GenericImageView;
-use image::ImageBuffer;
 use log::debug;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
-use std::hash::Hash;
-use image::io::Reader as ImageReader;
 use enum_map::enum_map;
 
+#[cfg(feature = "image")]
+mod image_imports {
+    pub use crate::sprite::Sprite;
+    pub use image::DynamicImage;
+    pub use image::GenericImageView;
+    pub use image::ImageBuffer;
+    pub use image::io::Reader as ImageReader;
+    pub use std::hash::Hash;
+    pub use std::collections::hash_map::DefaultHasher;
+    pub use std::hash::Hasher;
+    pub use std::collections::HashMap;
+    pub use std::path::PathBuf;
+    pub use serde::Deserialize;
+}
+
+#[cfg(feature = "image")]
+use image_imports::*;
 
 #[derive(Debug, Clone)]
-pub struct Tile {
-    pub sprite: Rc<Sprite>,
+pub struct Tile<T> {
+    pub value: Box<T>,
     /// todo: neighbours per side
     pub neighbors: Neighbors<Vec<u64>>,
 
     id: u64,
 }
 
+#[cfg(feature = "image")]
 #[derive(Debug, Deserialize)]
 pub struct TileConfig {
     image: PathBuf,
     slots: Vec<String>,
 }
 
-impl Tile {
+#[cfg(feature = "image")]
+impl Tile<image_imports::Sprite> {
     pub fn from_config(configs: &Vec<TileConfig>) -> Vec<Self> {
+
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
 
@@ -51,7 +59,7 @@ impl Tile {
             };
 
             let image = ImageReader::open(config.image.as_path()).unwrap().decode().unwrap();
-            let tile = Self::new(image);
+            let tile = Self::new_image_tile(image);
 
             slots.push((tile.get_id(), neighbors));
             output.push(tile);
@@ -86,7 +94,7 @@ impl Tile {
             let buffer =
                 ImageBuffer::from_fn(tile_width, tile_height, |ix, iy| view.get_pixel(ix, iy));
 
-            let new_tile = Tile::new(DynamicImage::from(buffer));
+            let new_tile = Tile::new_image_tile(DynamicImage::from(buffer));
             let tile_id = new_tile.get_id();
 
             unique.insert(tile_id, new_tile);
@@ -122,24 +130,28 @@ impl Tile {
 
         output
     }
-}
 
-impl Tile {
-    pub fn new(image: DynamicImage) -> Self {
+    pub fn new_image_tile(image: DynamicImage) -> Self {
         let mut hasher = DefaultHasher::new();
         let sprite = Sprite { image };
 
         sprite.hash(&mut hasher);
 
+        Self::new(hasher.finish(), sprite)
+    }
+}
+
+impl<T> Tile<T> {
+    pub fn new(id: u64, value: T) -> Self {
         Self {
-            id: hasher.finish(),
-            sprite: Rc::new(sprite),
+            id,
+            value: Box::new(value),
             neighbors: Default::default(),
         }
     }
 }
 
-impl Collapsable for Tile {
+impl<T> Collapsable for Tile<T> {
     type Identifier = u64;
 
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool {

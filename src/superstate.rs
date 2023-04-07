@@ -23,7 +23,7 @@ impl<T> SuperState<T>
 where
     T: Collapsable,
 {
-    pub(crate) fn new(possible: Vec<Rc<T>>) -> Self {
+    pub fn new(possible: Vec<Rc<T>>) -> Self {
         let base_entropy = possible.len();
 
         Self {
