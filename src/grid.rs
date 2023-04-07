@@ -45,6 +45,13 @@ impl FromStr for Size {
     }
 }
 
+impl Size {
+    pub fn scale(&mut self, factor: usize) {
+        self.width *= factor;
+        self.height *= factor;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Grid<T>
 where T: Clone {

@@ -10,23 +10,27 @@ use image::{ImageError, RgbaImage};
 use imageproc::drawing::draw_text_mut;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
-use log::{info, trace};
 use log::warn;
+use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 use rusttype::{Font, Scale};
+use sdl2::render::Canvas;
+use sdl2::video::Window;
+use sdl2::Sdl;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-use tile::TileConfig;
+use sprite::Sprite;
 use std::fmt::Debug;
 use std::fs::File;
+use std::io;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
+use structopt::clap::Shell;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
-use structopt::clap::Shell;
-use std::io;
+use tile::TileConfig;
 
 use grid::Size;
 use superstate::SuperState;
@@ -46,7 +50,8 @@ fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
     let path = PathBuf::from(s);
     let file = File::open(path).map_err(|e| format!("Failed to open config file: {}", e))?;
     let reader = BufReader::new(file);
-    let configs = serde_json::from_reader(reader).map_err(|e| format!("Failed to parse config file: {}", e))?;
+    let configs = serde_json::from_reader(reader)
+        .map_err(|e| format!("Failed to parse config file: {}", e))?;
 
     Ok(configs)
 }
@@ -61,6 +66,41 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
     }
 }
 
+#[cfg(feature = "sdl2")]
+struct SdlDraw {
+    context: Sdl,
+    canvas: Canvas<Window>,
+    fps: Option<u32>,
+}
+
+#[cfg(feature = "sdl2")]
+impl SdlDraw {
+    pub fn new(size: Size, fps: Option<u32>) -> Self {
+        let context = sdl2::init().unwrap();
+        let video = context.video().unwrap();
+
+        let window = video
+            .window("SDL2 Demo", size.width as u32, size.height as u32)
+            .position_centered()
+            .build()
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        let canvas = window
+            .into_canvas()
+            .target_texture()
+            .present_vsync()
+            .build()
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        Self {
+            context,
+            canvas,
+            fps,
+        }
+    }
+}
 
 #[derive(Debug)]
 enum Input {
@@ -70,26 +110,14 @@ enum Input {
 
 #[derive(Debug, StructOpt)]
 struct DisplayOpt {
-    #[structopt(
-        short="V",
-        long,
-        help = "Open a window to show the generation"
-    )]
+    #[structopt(short = "V", long, help = "Open a window to show the generation")]
     visual: bool,
 
-    #[structopt(
-        short="e",
-        long,
-        help = "Show entropy values in visualisation"
-    )]
+    #[structopt(short = "e", long, help = "Show entropy values in visualisation")]
     visual_entropy: bool,
 
-    #[structopt(
-        short,
-        long,
-        help = "Limit frames per second"
-    )]
-    fps: Option<u16>,
+    #[structopt(short, long, help = "Limit frames per second")]
+    fps: Option<u32>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -113,7 +141,11 @@ struct Opt {
     )]
     input_size: Option<Size>,
 
-    #[structopt(parse(from_os_str), help = "Output image", required_unless="completions")]
+    #[structopt(
+        parse(from_os_str),
+        help = "Output image",
+        required_unless = "completions"
+    )]
     output: Option<PathBuf>,
 
     #[structopt(
@@ -129,9 +161,10 @@ struct Opt {
     seed: Option<u64>,
 
     #[structopt(flatten)]
+    #[cfg(feature = "sdl2")]
     display: DisplayOpt,
 
-    #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]    
+    #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
 }
 
@@ -201,14 +234,34 @@ fn main() {
             .progress_chars("#>-"),
     );
 
+    let mut sdlDraw = if cfg!(feature = "sdl2") && opt.display.visual {
+        let (tile_width, tile_height) = tiles[0].value.image.dimensions();
+        let mut size = opt.output_size.clone();
+
+        assert_eq!(tile_width, tile_height);
+
+        size.scale(tile_width.try_into().unwrap());
+
+        Some(SdlDraw::new(size, opt.display.fps))
+    } else {
+        None
+    };
+
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
         wfc.tick();
+
+        if let Some(mut draw) = sdlDraw.as_mut() {
+            update_canvas(&wfc.grid, &mut draw);
+        }
     }
 
     progress.finish();
 
     info!("Drawing output");
+    if opt.output.is_none() {
+        return;
+    }
 
     // drawing
     let (tile_width, tile_height) = tiles[0].value.image.dimensions();
@@ -249,24 +302,65 @@ fn main() {
 
     trace!("Writing output");
 
-    // draw
-    // todo temporary for making animation
-    let file_path = opt.output.unwrap();
-    let file_name: String = file_path
-        .as_path()
-        .file_name()
+    canvas.save(opt.output.unwrap().as_path()).unwrap();
+}
+
+// todo only draw updated
+#[cfg(feature = "sdl2")]
+fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
+    use sdl2::{pixels::PixelFormatEnum, rect::Rect};
+
+    let (tile_width, tile_height) = grid
+        .get(0, 0)
         .unwrap()
-        .to_string_lossy()
-        .into();
+        .possible[0]
+        .value
+        .image
+        .dimensions();
 
-    if file_name.contains("{}") {
-        let mut path = file_path;
-        let new_name = file_name.replace("{}", format!("{:05}", wfc.remaining()).as_str());
+    context.canvas.clear();
+    let texture_creator = context.canvas.texture_creator();
 
-        path.set_file_name(new_name);
+    for (x, y, cell) in grid {
+        if let Some(t) = cell.collapsed() {
+            // todo streamline
+            let mut texture = texture_creator
+                .create_texture_streaming(PixelFormatEnum::RGBA32, tile_width, tile_height)
+                .map_err(|e| e.to_string())
+                .unwrap();
 
-        canvas.save(path).unwrap();
-    } else {
-        canvas.save(file_path.as_path()).unwrap();
+            let image_rgba = cell.collapsed().unwrap().value.image.to_rgba8();
+
+            texture
+                .with_lock(None, |buffer: &mut [u8], _: usize| {
+                    buffer.copy_from_slice(&image_rgba);
+                })
+                .map_err(|e| e.to_string())
+                .unwrap();
+
+            let rect = Rect::new(
+                x as i32 * tile_width as i32,
+                y as i32 * tile_height as i32,
+                tile_width,
+                tile_height,
+            );
+            context.canvas.copy(&texture, None, Some(rect)).unwrap();
+        } else {
+            // let scale = Scale::uniform(8.0);
+            // let color = Rgba([255, 0, 0, 255]); // red
+            // let text = format!("{}", cell.entropy());
+
+            // draw_text_mut(
+            //     &mut canvas,
+            //     color,
+            //     x as i32 * tile_width as i32,
+            //     y as i32 * tile_height as i32,
+            //     scale,
+            //     &font,
+            //     &text,
+            // );
+        }
     }
+
+    context.canvas.present();
 }
