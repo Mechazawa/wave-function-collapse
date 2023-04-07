@@ -10,7 +10,7 @@ use image::{ImageError, RgbaImage};
 use imageproc::drawing::draw_text_mut;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
-use log::info;
+use log::{info, trace};
 use log::warn;
 use rand::rngs::OsRng;
 use rand::Rng;
@@ -168,10 +168,16 @@ fn main() {
         wfc.tick();
     }
 
+    progress.finish();
+
+    info!("Drawing output");
+
     // drawing
     let (tile_width, tile_height) = tiles[0].sprite.image.dimensions();
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+
+    trace!("Tile size: {tile_width}x{tile_height}");
 
     let mut canvas = RgbaImage::new(
         opt.output_size.width as u32 * tile_width,
@@ -202,6 +208,8 @@ fn main() {
             );
         }
     }
+
+    trace!("Writing output");
 
     // draw
     // todo temporary for making animation
