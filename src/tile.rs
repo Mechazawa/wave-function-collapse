@@ -103,7 +103,7 @@ impl Tile {
                 if let Some(value) = maybe {
                     if !tile.neighbors[direction].contains(value) {
                         tile.neighbors[direction].push(*value);
-                        tile.neighbors[direction].sort_unstable();
+                        tile.neighbors[direction].sort();
                         assert!(!tile.neighbors[direction].is_empty());
                     }
                 }

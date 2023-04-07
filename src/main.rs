@@ -99,7 +99,7 @@ struct Opt {
     )]
     output_size: Size,
 
-    #[structopt(parse(try_from_str), short, long, help = "Random seed")]
+    #[structopt(parse(try_from_str), short, long, help = "Random seed (unstable)")]
     seed: Option<u64>,
 }
 
