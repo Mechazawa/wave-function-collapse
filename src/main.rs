@@ -114,6 +114,8 @@ fn main() {
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
     let mut collapse_stack: Vec<(usize, bool)> = vec![];
 
+    collapse_stack.reserve_exact(grid.len());
+
     {
         // todo: it always starts in left-bottom??
         stack.shuffle(&mut rng);
