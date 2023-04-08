@@ -129,7 +129,7 @@ struct Opt {
         required_if("input", "config"),
         help = "Input image grid size"
     )]
-    input_size: Option<Size>,
+    input_size: Option<usize>,
 
     #[structopt(
         parse(from_os_str),
@@ -176,7 +176,7 @@ fn main() {
     .unwrap();
 
     let mut tiles = match &opt.input.unwrap() {
-        Input::Image(value) => Tile::from_image(value, &opt.input_size.unwrap()),
+        Input::Image(value) => Tile::from_image(value, &Size::uniform(opt.input_size.unwrap())),
         Input::Config(value) => Tile::from_config(value),
     };
 

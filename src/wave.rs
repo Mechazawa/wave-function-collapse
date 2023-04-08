@@ -56,7 +56,7 @@ where
 
         if pos.is_none() {
             trace!("Failed to find edge to collapse");
-            
+
             return self.collapse_any();
         } else {
             return pos;
@@ -66,7 +66,7 @@ where
     pub fn tick(&mut self) -> bool {
         if self.stack.is_empty() && self.maybe_collapse().is_none() {
             return false;
-        } 
+        }
 
         while let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);
@@ -82,17 +82,26 @@ where
             Some((x, y))
         } else if let Some(value) = self.maybe_collapse() {
             return Some(value);
-         } else {
+        } else {
             None
         }
     }
 
     fn tick_cell(&mut self, x: usize, y: usize) {
-        let cell = self.grid.get_mut(x, y).unwrap();
-
-        if cell.entropy() == 1 {
+        if self.grid.get(x, y).unwrap().entropy() == 1 {
             return;
         }
+
+        if self.data.get(x, y).unwrap().is_none() {
+            let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
+                None => Vec::new(),
+                Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
+            });
+
+            self.data.set(x, y, Some(data)).unwrap();
+        }
+
+        let cell = self.grid.get_mut(x, y).unwrap();
 
         let neighbors = self.data.get(x, y).unwrap().clone().unwrap();
 
@@ -118,7 +127,7 @@ where
         self.mark(x, y);
     }
 
-    pub fn collapse_any(&mut self) ->  Option<Position> {
+    pub fn collapse_any(&mut self) -> Option<Position> {
         let maybe = self
             .grid
             .iter()
@@ -247,7 +256,15 @@ where
             let value = self.grid_base.get(x, y).unwrap().clone();
 
             self.grid.set(x, y, value).unwrap();
+
+            let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
+                None => Vec::new(),
+                Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
+            });
+
             self.mark(x, y);
+            self.data.set(x, y, Some(data)).unwrap();
+            self.stack.push_back((x, y));
         }
     }
 }
