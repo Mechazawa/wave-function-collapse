@@ -21,44 +21,30 @@ where
     ticks: u32,
     rollbacks: u16,
 
-    old_stack_len: usize,
-    old_collapse_stack_len: usize,
-}
-
-pub struct Updated {
-    x: usize,
-    y: usize,
-    collapsed: bool,
+    updated: Vec<Position>,
 }
 
 impl<T> WaveFuncCollapse<T>
 where
     T: Collapsable + Clone,
 {
-    pub fn new(mut grid: Grid<SuperState<T>>, seed: u64) -> Self {
+    pub fn new(grid: Grid<SuperState<T>>, seed: u64) -> Self {
         let mut rng = XorShiftRng::seed_from_u64(seed);
 
         let mut stack: Vec<Position> = grid.iter().map(|(x, y, _)| (x, y)).collect();
         let collapse_stack = Vec::with_capacity(stack.len());
 
-        stack.reverse();
-
-        let (x, y) = stack.pop().unwrap();
         stack.shuffle(&mut rng);
-        grid.get_mut(x, y).unwrap().collapse(0, &mut rng);
-
-        debug!("Starting at ({}, {})", x, y);
 
         Self {
             base: grid.clone(),
+            updated: Vec::with_capacity(grid.size()),
             grid,
             stack,
             rng: Box::new(rng),
             collapse_stack,
             ticks: 0,
             rollbacks: 0,
-            old_stack_len: 0,
-            old_collapse_stack_len: 0,
         }
     }
 
@@ -86,20 +72,25 @@ where
         }
 
         if do_test {
-            self.grid
+            let cell = self.grid
                 .get_mut(x, y)
-                .unwrap()
-                .tick(self.ticks, &neighbors);
+                .unwrap();
+
+            if self.ticks != cell.last_tick {
+                self.updated.push((x, y));
+            }
+
+            cell.tick(self.ticks, &neighbors);
         }
     }
 
     pub fn tick(&mut self) {
-        self.old_stack_len = self.stack.len();
-        self.old_collapse_stack_len = self.collapse_stack.len();
-
+        self.updated.clear();
         self.ticks += 1;
 
-        for (x, y) in self.stack.clone() {
+        for index in 0..self.stack.len() {
+            let (x, y) = self.stack[index];
+
             self.tick_cell(x, y, false);
         }
 
@@ -273,6 +264,10 @@ where
 
         // sort the stack again
         self.fixup();
+
+        for (x, y) in self.stack.clone() {
+            self.tick_cell(x, y, true);
+        }
     }
 
     fn fixup(&mut self) {
@@ -292,43 +287,7 @@ where
         });
     }
 
-    pub fn get_updated(&self) -> Vec<Updated> {
-        let stack_len = self.stack.len();
-        let stack_diff = if stack_len >= self.old_stack_len {
-            stack_len - self.old_stack_len
-        } else {
-            0
-        };
-
-        let collapse_len = self.collapse_stack.len();
-        let collapse_diff = if collapse_len >= self.old_collapse_stack_len {
-            collapse_len - self.old_collapse_stack_len
-        } else {
-            0
-        };
-
-        let mut output = Vec::with_capacity(collapse_diff + stack_diff);
-
-        for i in stack_len..(stack_len - stack_diff) {
-            let item = self.stack[i];
-
-            output.push(Updated {
-                x: item.0,
-                y: item.1,
-                collapsed: false,
-            });
-        }
-
-        for i in collapse_len..(collapse_len - collapse_diff) {
-            let item = self.collapse_stack[i];
-
-            output.push(Updated {
-                x: item.0,
-                y: item.1,
-                collapsed: true,
-            });
-        }
-
-        output
+    pub fn get_updated(&self) -> &Vec<Position> {
+        &self.updated
     }
 }
