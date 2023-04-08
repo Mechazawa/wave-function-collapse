@@ -4,6 +4,7 @@ mod superstate;
 mod tile;
 mod wave;
 
+
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
 use image::{ImageError, RgbaImage};
 
@@ -14,13 +15,12 @@ use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 
-use sdl2::render::{Canvas, Texture, TextureCreator};
-use sdl2::video::{Window, WindowContext};
+use sdl2::render::Canvas;
+use sdl2::video::Window;
 use sdl2::EventPump;
 use sdl2::{event::Event, keyboard::Keycode};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use sprite::Sprite;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io;
@@ -32,20 +32,14 @@ use structopt::clap::Shell;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 use tile::TileConfig;
-use std::sync::Mutex;
-use superstate::Collapsable;
-
 
 use grid::Size;
 use superstate::SuperState;
 use tile::Tile;
 
 use crate::grid::Grid;
-use sdl2::{
-    pixels::{Color, PixelFormatEnum},
-    rect::Rect,
-};
 use wave::Wave;
+use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -75,15 +69,13 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
 }
 
 #[cfg(feature = "sdl2")]
-struct SdlDraw<'r> {
+struct SdlDraw {
     canvas: Canvas<Window>,
     events: EventPump,
-    textures: HashMap<u64, Texture<'r>>,
-    texture_creator: TextureCreator<WindowContext>,
 }
 
 #[cfg(feature = "sdl2")]
-impl<'r> SdlDraw<'r> {
+impl SdlDraw {
     pub fn new(size: Size) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
@@ -104,13 +96,10 @@ impl<'r> SdlDraw<'r> {
             .unwrap();
 
         let events = context.event_pump().unwrap();
-        let texture_creator = canvas.texture_creator();
 
         Self {
             canvas,
             events,
-            textures: Default::default(),
-            texture_creator,
         }
     }
 }
@@ -244,28 +233,28 @@ fn main() {
 
         size.scale(tile_width.try_into().unwrap());
 
-        Some(Rc::new(Mutex::new(SdlDraw::new(size))))
+        Some(SdlDraw::new(size))
     } else {
         None
     };
 
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
-        wfc.tick_once();
+        wfc.tick();
 
         if let Some(draw) = sdl_draw.as_mut() {
-            // for event in draw.events.poll_iter() {
-            //     match event {
-            //         Event::Quit { .. }
-            //         | Event::KeyDown {
-            //             keycode: Some(Keycode::Escape),
-            //             ..
-            //         } => return,
-            //         _ => {}
-            //     }
-            // }
+            for event in draw.events.poll_iter() {
+                match event {
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => return,
+                    _ => {}
+                }
+            }
 
-            update_canvas(&wfc, draw.clone());
+            update_canvas(&wfc, draw);
         }
     }
 
@@ -304,75 +293,59 @@ fn main() {
 
 // todo only draw updated
 #[cfg(feature = "sdl2")]
-fn update_canvas<'a>(wfc: &Wave<Tile<Sprite>>, context: Rc<Mutex<SdlDraw<'a>>>) {
-    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
-        .value
-        .image
-        .dimensions();
+fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
 
-    context.lock().unwrap().canvas.clear();
+    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
+
+    // context.canvas.clear();
+    let texture_creator = context.canvas.texture_creator();
+
+    // let ttf_context = sdl2::ttf::init().unwrap();
+    // let font = ttf_context.load_font("src/PublicPixel-z84yD.ttf", 8).unwrap();
 
     for (x, y, cell) in &wfc.grid {
         if let Some(_t) = cell.collapsed() {
             // todo streamline
-            let tile = cell.collapsed().unwrap();
-            if context.lock().unwrap().textures.get(&tile.get_id()).is_none() {
-                let lcontext = context
-                    .lock()
-                    .unwrap();
-                let mut texture = lcontext
-                    .texture_creator
-                    .create_texture_streaming(PixelFormatEnum::RGBA32, tile_width, tile_height)
-                    .map_err(|e| e.to_string())
-                    .unwrap();
+            let mut texture = texture_creator
+                .create_texture_streaming(PixelFormatEnum::RGBA32, tile_width, tile_height)
+                .map_err(|e| e.to_string())
+                .unwrap();
 
-                let image_rgba = tile.value.image.to_rgba8();
+            let image_rgba = cell.collapsed().unwrap().value.image.to_rgba8();
 
-                texture
-                    .with_lock(None, |buffer: &mut [u8], _: usize| {
-                        buffer.copy_from_slice(&image_rgba);
-                    })
-                    .unwrap();
-
-                context.lock().unwrap().textures.insert(tile.get_id(), texture);
-            }
-
+            texture
+                .with_lock(None, |buffer: &mut [u8], _: usize| {
+                    buffer.copy_from_slice(&image_rgba);
+                })
+                .unwrap();
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
                 tile_width,
                 tile_height,
             );
-
-            context
-            .lock().unwrap()
-                .canvas
-                .copy(
-                    context.lock().unwrap().textures.get(&tile.get_id()).unwrap(),
-                    None,
-                    Some(rect),
-                )
-                .unwrap();
+            context.canvas.copy(&texture, None, Some(rect)).unwrap();
         } else {
             let color = if cell.entropy() > 0 {
                 let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
                 let value = (255.0 * (1.0 - ratio)) as u8;
+
                 Color::RGB(0, value / 3, value / 2)
             } else {
                 Color::RED
             };
-
+            
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
                 tile_width,
                 tile_height,
             );
-
-            context.lock().unwrap().canvas.set_draw_color(color);
-            context.lock().unwrap().canvas.fill_rect(rect).unwrap();
+        
+            context.canvas.set_draw_color(color);
+            context.canvas.fill_rect(rect).unwrap();
         }
     }
 
-    context.lock().unwrap().canvas.present();
+    context.canvas.present();
 }
