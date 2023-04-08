@@ -1,17 +1,16 @@
-use log::{debug, trace, warn};
+use log::{trace, warn};
 use rand::prelude::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use crate::grid::{Grid, Neighbors};
+use crate::grid::{Grid, Neighbors, Position};
 use crate::superstate::{Collapsable, SuperState};
 
 type CollapsedItem = (usize, usize, bool);
-type Position = (usize, usize);
 
 pub struct WaveFuncCollapse<T>
 where
-    T: Collapsable + Clone,
+    T: Collapsable,
 {
     pub grid: Grid<SuperState<T>>,
     rng: Box<dyn RngCore>,
@@ -26,7 +25,7 @@ where
 
 impl<T> WaveFuncCollapse<T>
 where
-    T: Collapsable + Clone,
+    T: Collapsable,
 {
     pub fn new(grid: Grid<SuperState<T>>, seed: u64) -> Self {
         let mut rng = XorShiftRng::seed_from_u64(seed);

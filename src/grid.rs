@@ -20,6 +20,8 @@ impl Direction {
     }
 }
 
+pub type Position = (usize, usize);
+
 pub type Neighbors<T> = EnumMap<Direction, T>;
 
 #[derive(Debug, Copy, Clone)]
@@ -125,8 +127,17 @@ where T: Clone {
         }
     }
 
-    pub fn get_neighbor(&self, x: usize, y: usize, direction: Direction) -> Option<&T> {
-        let (x, y) = match direction {
+    pub fn get_neighbor_positions(&self, x: usize, y: usize) -> Neighbors<Option<Position>> {
+        enum_map! {
+            Direction::Up => self.get_neighbor_position(x, y, Direction::Up),
+            Direction::Down => self.get_neighbor_position(x, y, Direction::Down),
+            Direction::Left => self.get_neighbor_position(x, y, Direction::Left),
+            Direction::Right => self.get_neighbor_position(x, y, Direction::Right),
+        }
+    }
+
+    pub fn get_neighbor_position(&self, x: usize, y: usize, direction: Direction) -> Option<Position> {
+        match direction {
             Direction::Up => {
                 if y == 0 {
                     None
@@ -155,9 +166,13 @@ where T: Clone {
                     Some((x + 1, y))
                 }
             }
-        }?;
+        }
+    }
 
-        self.get(x, y)
+    pub fn get_neighbor(&self, x: usize, y: usize, direction: Direction) -> Option<&T> {
+        let (lx, ly) = self.get_neighbor_position(x, y, direction)?;
+        
+        self.get(lx, ly)
     }
 
     pub fn width(&self) -> usize {
