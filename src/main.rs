@@ -4,17 +4,17 @@ mod superstate;
 mod tile;
 mod wfc;
 
-use image::Rgba;
+
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
 use image::{ImageError, RgbaImage};
-use imageproc::drawing::draw_text_mut;
+
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use log::warn;
 use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
-use rusttype::{Font, Scale};
+
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::{Sdl, EventPump};
@@ -242,7 +242,7 @@ fn main() {
 
     let mut sdlDraw = if cfg!(feature = "sdl2") && opt.display.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
-        let mut size = opt.output_size.clone();
+        let mut size = opt.output_size;
 
         assert_eq!(tile_width, tile_height);
 
@@ -258,7 +258,7 @@ fn main() {
         wfc.tick();
 
         {
-            if let Some(mut draw) = sdlDraw.as_mut() {
+            if let Some(draw) = sdlDraw.as_mut() {
                 for event in draw.events.poll_iter() {
                     match event {
                         Event::Quit { .. }
@@ -269,7 +269,7 @@ fn main() {
                         _ => {}
                     }
                 }
-                update_canvas(&wfc.grid, &mut draw);
+                update_canvas(&wfc.grid, draw);
             }
         }
     }
@@ -283,8 +283,6 @@ fn main() {
 
     // drawing
     let (tile_width, tile_height) = tiles[0].value.image.dimensions();
-    let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
-    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
     trace!("Tile size: {tile_width}x{tile_height}");
 
@@ -301,20 +299,6 @@ fn main() {
                 x as i64 * tile_width as i64,
                 y as i64 * tile_height as i64,
             );
-        } else {
-            let scale = Scale::uniform(8.0);
-            let color = Rgba([255, 0, 0, 255]); // red
-            let text = format!("{}", cell.entropy());
-
-            draw_text_mut(
-                &mut canvas,
-                color,
-                x as i32 * tile_width as i32,
-                y as i32 * tile_height as i32,
-                scale,
-                &font,
-                &text,
-            );
         }
     }
 
@@ -326,15 +310,19 @@ fn main() {
 // todo only draw updated
 #[cfg(feature = "sdl2")]
 fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
-    use sdl2::{pixels::PixelFormatEnum, rect::Rect};
+    use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
 
     let (tile_width, tile_height) = grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
 
     context.canvas.clear();
     let texture_creator = context.canvas.texture_creator();
 
+    let ttf_context = sdl2::ttf::init().unwrap();
+    let font = ttf_context.load_font("src/PublicPixel-z84yD.ttf", 8).unwrap();
+
+
     for (x, y, cell) in grid {
-        if let Some(t) = cell.collapsed() {
+        if let Some(_t) = cell.collapsed() {
             // todo streamline
             let mut texture = texture_creator
                 .create_texture_streaming(PixelFormatEnum::RGBA32, tile_width, tile_height)
@@ -347,9 +335,7 @@ fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
                 .with_lock(None, |buffer: &mut [u8], _: usize| {
                     buffer.copy_from_slice(&image_rgba);
                 })
-                .map_err(|e| e.to_string())
                 .unwrap();
-
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
@@ -358,19 +344,21 @@ fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
             );
             context.canvas.copy(&texture, None, Some(rect)).unwrap();
         } else {
-            // let scale = Scale::uniform(8.0);
-            // let color = Rgba([255, 0, 0, 255]); // red
-            // let text = format!("{}", cell.entropy());
-
-            // draw_text_mut(
-            //     &mut canvas,
-            //     color,
-            //     x as i32 * tile_width as i32,
-            //     y as i32 * tile_height as i32,
-            //     scale,
-            //     &font,
-            //     &text,
-            // );
+            let text = format!("{}", cell.entropy());
+            
+            let surface = font.render(&text).solid(Color::RGB(255, 0, 0)).unwrap();
+            let texture = texture_creator
+                .create_texture_from_surface(&surface)
+                .map_err(|e| e.to_string())
+                .unwrap();
+            let rect = Rect::new(
+                x as i32 * tile_width as i32,
+                y as i32 * tile_height as i32,
+                surface.width(),
+                surface.height(),
+            );
+        
+            context.canvas.copy(&texture, None, Some(rect)).unwrap();
         }
     }
 
