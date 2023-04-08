@@ -88,6 +88,12 @@ where
         self.updated.clear();
         self.ticks += 1;
 
+        // redo how this works, we need to wave through the grid not iterate
+        // if entropy changes
+        //   - get list of neighbors
+        //   - push to stack
+        //   - tick only updated side with new value
+        // repeat untill the stack is empty
         for index in 0..self.stack.len() {
             let (x, y) = self.stack[index];
 
