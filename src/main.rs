@@ -3,6 +3,7 @@ mod sprite;
 mod superstate;
 mod tile;
 mod wfc;
+mod wave;
 
 
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
@@ -69,15 +70,13 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
 
 #[cfg(feature = "sdl2")]
 struct SdlDraw {
-    context: Sdl,
     canvas: Canvas<Window>,
     events: EventPump,
-    fps: Option<u32>,
 }
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size, fps: Option<u32>) -> Self {
+    pub fn new(size: Size) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
@@ -99,9 +98,7 @@ impl SdlDraw {
         let events = context.event_pump().unwrap();
 
         Self {
-            context,
             canvas,
-            fps,
             events,
         }
     }
@@ -111,18 +108,6 @@ impl SdlDraw {
 enum Input {
     Image(DynamicImage),
     Config(Vec<TileConfig>),
-}
-
-#[derive(Debug, StructOpt)]
-struct DisplayOpt {
-    #[structopt(short = "V", long, help = "Open a window to show the generation")]
-    visual: bool,
-
-    #[structopt(short = "e", long, help = "Show entropy values in visualisation")]
-    visual_entropy: bool,
-
-    #[structopt(short, long, help = "Limit frames per second")]
-    fps: Option<u32>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -165,9 +150,9 @@ struct Opt {
     #[structopt(parse(try_from_str), short, long, help = "Random seed (unstable)")]
     seed: Option<u64>,
 
-    #[structopt(flatten)]
     #[cfg(feature = "sdl2")]
-    display: DisplayOpt,
+    #[structopt(short = "V", long, help = "Open a window to show the generation")]
+    visual: bool,
 
     #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
@@ -239,7 +224,7 @@ fn main() {
             .progress_chars("#>-"),
     );
 
-    let mut sdlDraw = if cfg!(feature = "sdl2") && opt.display.visual {
+    let mut sdl_draw = if cfg!(feature = "sdl2") && opt.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
         let mut size = opt.output_size;
 
@@ -247,7 +232,7 @@ fn main() {
 
         size.scale(tile_width.try_into().unwrap());
 
-        Some(SdlDraw::new(size, opt.display.fps))
+        Some(SdlDraw::new(size))
     } else {
         None
     };
@@ -256,7 +241,7 @@ fn main() {
         progress.set_position(max_progress - wfc.remaining() as u64);
         wfc.tick();
 
-        if let Some(draw) = sdlDraw.as_mut() {
+        if let Some(draw) = sdl_draw.as_mut() {
             for event in draw.events.poll_iter() {
                 match event {
                     Event::Quit { .. }
