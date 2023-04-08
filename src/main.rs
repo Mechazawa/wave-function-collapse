@@ -18,6 +18,7 @@ use rand::Rng;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::{Sdl, EventPump};
+use sdl2::{event::Event, keyboard::Keycode};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use sprite::Sprite;
 use std::fmt::Debug;
@@ -174,8 +175,6 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
-    use sdl2::{event::Event, keyboard::Keycode};
-
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -257,20 +256,19 @@ fn main() {
         progress.set_position(max_progress - wfc.remaining() as u64);
         wfc.tick();
 
-        {
-            if let Some(draw) = sdlDraw.as_mut() {
-                for event in draw.events.poll_iter() {
-                    match event {
-                        Event::Quit { .. }
-                        | Event::KeyDown {
-                            keycode: Some(Keycode::Escape),
-                            ..
-                        } => return,
-                        _ => {}
-                    }
+        if let Some(draw) = sdlDraw.as_mut() {
+            for event in draw.events.poll_iter() {
+                match event {
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => return,
+                    _ => {}
                 }
-                update_canvas(&wfc, draw);
             }
+
+            update_canvas(&wfc, draw);
         }
     }
 
