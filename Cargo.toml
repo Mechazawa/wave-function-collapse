@@ -24,6 +24,6 @@ structopt = "0.3"
 structopt-flags = "0.3"
 
 [features]
-default = ["image", "sdl2"]
+default = ["image"]
 image = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]
 sdl2 = ["image", "dep:sdl2"]
