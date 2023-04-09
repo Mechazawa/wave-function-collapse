@@ -3,7 +3,7 @@ use crate::grid::Grid;
 use crate::grid::Neighbors;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
-use crate::tile;
+
 use enum_map::enum_map;
 use log::debug;
 

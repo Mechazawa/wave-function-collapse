@@ -57,9 +57,9 @@ where
         if pos.is_none() {
             trace!("Failed to find edge to collapse");
 
-            return self.collapse_any();
+            self.collapse_any()
         } else {
-            return pos;
+            pos
         }
     }
 
@@ -172,12 +172,11 @@ where
                 self.grid
                     .get_neighbors(*x, *y)
                     .values()
-                    .find(|&&cell| cell.is_some() && cell.unwrap().entropy() == 1)
-                    .is_some()
+                    .any(|&cell| cell.is_some() && cell.unwrap().entropy() == 1)
             })
             .collect();
 
-        if choices.len() == 0 {
+        if choices.is_empty() {
             None
         } else {
             let &(x, y) = choices.choose(&mut self.rng).unwrap();
