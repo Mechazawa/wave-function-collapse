@@ -16,7 +16,6 @@ where
     T: Collapsable,
 {
     pub possible: Vec<Rc<T>>,
-    pub last_tick: u32,
     base_entropy: usize,
 }
 
@@ -29,7 +28,6 @@ where
 
         Self {
             possible,
-            last_tick: 0,
             base_entropy,
         }
     }
@@ -55,19 +53,28 @@ where
 
     pub fn collapse(&mut self, tick: u32, rng: &mut dyn RngCore) {
         if self.entropy() > 1 {
-            self.last_tick = tick;
-            self.possible = vec![self.possible.choose_weighted(rng, |v| v.get_weight()).unwrap().clone()];
+            self.possible = vec![self
+                .possible
+                .choose_weighted(rng, |v| v.get_weight())
+                .unwrap()
+                .clone()];
         }
     }
 
-    pub fn tick(&mut self, tick: u32, neighbors: &Neighbors<Vec<T::Identifier>>) {
+    pub fn tick(&mut self, neighbors: &Neighbors<Vec<T::Identifier>>) {
         let entropy = self.entropy();
 
         if neighbors.len() > 0 && entropy > 1 {
-            self.possible.retain(|v| v.test(neighbors));
+            // self.possible.retain(|v| v.test(neighbors));
 
-            if entropy != self.entropy() {
-                self.last_tick = tick;
+            // This is faster than retaining
+            let mut i = 0;
+            while i < self.possible.len() {
+                if !self.possible[i].test(neighbors) {
+                    self.possible.remove(i);
+                } else {
+                    i += 1;
+                }
             }
         }
     }

@@ -185,6 +185,7 @@ impl<T: Clone> Collapsable for Tile<T> {
             for tile in tiles {
                 if possible.contains(tile) {
                     found = true;
+                    break;
                 }
             }
 

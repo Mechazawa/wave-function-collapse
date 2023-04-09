@@ -108,7 +108,7 @@ where
         self.data.set(x, y, None).unwrap();
         let old_entropy = cell.entropy();
 
-        cell.tick(0, &neighbors);
+        cell.tick(&neighbors);
 
         if cell.entropy() <= 1 {
             self.collapsed.push(((x, y), CollapseReason::Implicit));
@@ -222,7 +222,7 @@ where
 
     fn rollback(&mut self, mut count: usize) {
         assert!(count > 0, "Rollback count must be at least 1");
-        warn!("Rollback {count}");
+        trace!("Rollback {count}");
 
         // empty stack
         self.stack.clear();
