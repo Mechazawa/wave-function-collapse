@@ -3,22 +3,23 @@ use crate::grid::Grid;
 use crate::grid::Neighbors;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
-use log::debug;
+use crate::tile;
 use enum_map::enum_map;
+use log::debug;
 
 #[cfg(feature = "image")]
 mod image_imports {
     pub use crate::sprite::Sprite;
+    pub use image::io::Reader as ImageReader;
     pub use image::DynamicImage;
     pub use image::GenericImageView;
     pub use image::ImageBuffer;
-    pub use image::io::Reader as ImageReader;
-    pub use std::hash::Hash;
-    pub use std::collections::hash_map::DefaultHasher;
-    pub use std::hash::Hasher;
-    pub use std::collections::HashMap;
-    pub use std::path::PathBuf;
     pub use serde::Deserialize;
+    pub use std::collections::hash_map::DefaultHasher;
+    pub use std::collections::HashMap;
+    pub use std::hash::Hash;
+    pub use std::hash::Hasher;
+    pub use std::path::PathBuf;
 }
 
 #[cfg(feature = "image")]
@@ -43,7 +44,6 @@ pub struct TileConfig {
 #[cfg(feature = "image")]
 impl Tile<Sprite> {
     pub fn from_config(configs: &Vec<TileConfig>) -> Vec<Self> {
-
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
 
@@ -51,24 +51,28 @@ impl Tile<Sprite> {
         slots.reserve_exact(configs.len());
 
         for config in configs {
-            let neighbors = enum_map!{
+            let neighbors = enum_map! {
                 Direction::Up => config.slots[0].clone(),
                 Direction::Right => config.slots[1].clone(),
                 Direction::Down => config.slots[2].clone(),
                 Direction::Left => config.slots[3].clone(),
             };
 
-            let image = ImageReader::open(config.image.as_path()).unwrap().decode().unwrap();
+            let image = ImageReader::open(config.image.as_path())
+                .unwrap()
+                .decode()
+                .unwrap();
             let tile = Self::new_image_tile(image);
 
             slots.push((tile.get_id(), neighbors));
             output.push(tile);
         }
 
-        for index in 0..slots.len()  {
+        for index in 0..slots.len() {
             for (id, neighbors) in &slots {
                 for (direction, key) in neighbors {
-                    let rev_key: String = slots[index].1[direction.invert()].chars().rev().collect();
+                    let rev_key: String =
+                        slots[index].1[direction.invert()].chars().rev().collect();
 
                     if *key == rev_key {
                         output[index].neighbors[direction].push(*id);
@@ -80,19 +84,28 @@ impl Tile<Sprite> {
         output
     }
 
-    pub fn from_image(image: &DynamicImage, grid_size: &Size) -> Vec<Self> {
+    pub fn from_image(image: &DynamicImage, tile_size: &Size) -> Vec<Self> {
         let (image_width, image_height) = image.dimensions();
-        let tile_width = image_width / grid_size.width as u32;
-        let tile_height = image_height / grid_size.height as u32;
+        let grid_width = image_width as usize / tile_size.width;
+        let grid_height = image_height as usize / tile_size.height;
 
         let mut unique: HashMap<u64, Self> = Default::default();
 
+        debug!("Input grid: {grid_width}x{grid_height}");
+
         debug!("Generating tiles");
-        let grid = Grid::new(grid_size.width, grid_size.height, &mut |x, y| {
-            let view = image.view(x as u32 * tile_width, y as u32 * tile_height, tile_width, tile_height);
+        let grid = Grid::new(grid_width, grid_height, &mut |x, y| {
+            let view = image.view(
+                x as u32 * tile_size.width as u32,
+                y as u32 * tile_size.height as u32,
+                tile_size.width as u32,
+                tile_size.height as u32,
+            );
 
             let buffer =
-                ImageBuffer::from_fn(tile_width, tile_height, |ix, iy| view.get_pixel(ix, iy));
+                ImageBuffer::from_fn(tile_size.width as u32, tile_size.height as u32, |ix, iy| {
+                    view.get_pixel(ix, iy)
+                });
 
             let new_tile = Tile::new_image_tile(DynamicImage::from(buffer));
             let tile_id = new_tile.get_id();
@@ -157,7 +170,7 @@ impl<T: Clone> Collapsable for Tile<T> {
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool {
         for (direction, tiles) in neighbors {
             if tiles.is_empty() {
-                continue
+                continue;
             }
 
             let possible = &self.neighbors[direction];
