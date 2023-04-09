@@ -32,6 +32,7 @@ pub struct Tile<T> {
     pub neighbors: Neighbors<Vec<u64>>,
 
     id: u64,
+    pub weight: usize,
 }
 
 #[cfg(feature = "image")]
@@ -112,6 +113,9 @@ impl Tile<Sprite> {
 
             unique.insert(tile_id, new_tile);
 
+            unique.get_mut(&tile_id).unwrap().weight += 1;
+
+            assert_ne!(unique.get(&tile_id).unwrap().get_weight(), 1);
             unique.get(&tile_id).unwrap().get_id()
         });
 
@@ -160,6 +164,7 @@ impl<T> Tile<T> {
             id,
             value: Box::new(value),
             neighbors: Default::default(),
+            weight: 1,
         }
     }
 }
@@ -193,5 +198,9 @@ impl<T: Clone> Collapsable for Tile<T> {
 
     fn get_id(&self) -> Self::Identifier {
         self.id
+    }
+
+    fn get_weight(&self) -> usize {
+        self.weight
     }
 }
