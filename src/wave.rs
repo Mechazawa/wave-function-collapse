@@ -1,11 +1,11 @@
-use std::collections::{VecDeque, HashSet};
+use std::collections::{HashSet, VecDeque};
 
 use log::trace;
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{thread_rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use crate::grid::{Grid, Neighbors, Position};
+use crate::grid::{Direction, Grid, Neighbors, Position};
 use crate::superstate::{Collapsable, SuperState};
 
 type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
@@ -223,9 +223,55 @@ where
         }
     }
 
+    fn rollback_propegate(&mut self, x: usize, y: usize, from: Option<Direction>) {
+        // set state to base state
+        let base = self.grid_base.get(x, y).unwrap().clone();
+        self.grid.set(x, y, base).unwrap();
+        self.mark(x, y);
+
+        // for each neighbor (skipping "from" direction)
+        //  - get entropy
+        //  - set to base
+        //  - tick
+        //  - if entropy changed recurse
+
+        for (direction, value) in self.grid.get_neighbor_positions(x, y) {
+            if direction == from.unwrap_or(direction.invert()) {
+                continue;
+            }
+
+            if let Some((nx, ny)) = value {
+                let cell = self.grid.get(nx, ny).unwrap();
+                let entropy = cell.entropy();
+
+                if entropy == 1 || !cell.collapsing() {
+                    continue;
+                }
+
+                let mut base = self.grid_base.get(nx, ny).unwrap().clone();
+
+                let neighbors = self.grid.get_neighbors(nx, ny).map(|_, v| match v {
+                    None => Set::new(),
+                    Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
+                });
+
+                base.tick(&neighbors);
+
+                let new_entropy = base.entropy();
+
+                if entropy != new_entropy {
+                    self.rollback_propegate(nx, ny, Some(direction.invert()));
+                }
+            }
+        }
+    }
+
     fn rollback(&mut self, mut count: usize) {
-        assert!(count > 0, "Rollback count must be at least 1");
         trace!("Rollback {count}");
+
+        if count == 0 {
+            return;
+        }
 
         // empty stack
         self.stack.clear();
@@ -235,8 +281,9 @@ where
 
         // revert last step of collapse stack
         while let Some(((x, y), reason)) = self.collapsed.pop() {
-            let value = self.grid_base.get(x, y).unwrap().clone();
-            self.grid.set(x, y, value).unwrap();
+            self.rollback_propegate(x, y, None);
+
+            self.stack.push_front((x, y));
 
             if reason == CollapseReason::Explicit {
                 count -= 1;
@@ -245,22 +292,6 @@ where
                     break;
                 }
             }
-        }
-
-        let positions: Vec<Position> = self
-            .grid
-            .iter()
-            .filter(|&(_, _, cell)| cell.entropy() > 1)
-            .map(|(x, y, _)| (x, y))
-            .collect();
-
-        for (x, y) in positions {
-            let value = self.grid_base.get(x, y).unwrap().clone();
-
-            self.grid.set(x, y, value).unwrap();
-
-            self.mark(x, y);
-            self.stack.push_back((x, y));
         }
     }
 }
