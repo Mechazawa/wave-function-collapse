@@ -156,6 +156,10 @@ struct Opt {
 
     #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
+
+    #[cfg(feature = "sdl2")]
+    #[structopt(short, long, help = "Render every step during visualisation")]
+    slow: bool,
 }
 
 #[cfg(feature = "image")]
@@ -240,8 +244,12 @@ fn main() {
 
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
-        wfc.tick();
-        // wfc.tick_once();
+
+        if opt.slow {
+            wfc.tick_once();
+        } else {
+            wfc.tick();
+        }
 
         if let Some(draw) = sdl_draw.as_mut() {
             for event in draw.events.poll_iter() {
