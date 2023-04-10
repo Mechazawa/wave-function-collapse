@@ -227,7 +227,7 @@ where
         // set state to base state
         let base = self.grid_base.get(x, y).unwrap().clone();
         self.grid.set(x, y, base).unwrap();
-        self.mark(x, y);
+        self.stack.push_back((x, y));
 
         // for each neighbor (skipping "from" direction)
         //  - get entropy
