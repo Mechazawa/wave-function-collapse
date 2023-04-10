@@ -3,6 +3,7 @@ use crate::grid::Grid;
 use crate::grid::Neighbors;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
+use crate::wave::Set;
 
 use enum_map::enum_map;
 use log::debug;
@@ -29,7 +30,7 @@ use image_imports::*;
 pub struct Tile<T> {
     pub value: Box<T>,
     /// todo: neighbours per side
-    pub neighbors: Neighbors<Vec<u64>>,
+    pub neighbors: Neighbors<Set<u64>>,
 
     id: u64,
     pub weight: usize,
@@ -76,7 +77,7 @@ impl Tile<Sprite> {
                         slots[index].1[direction.invert()].chars().rev().collect();
 
                     if *key == rev_key {
-                        output[index].neighbors[direction].push(*id);
+                        output[index].neighbors[direction].insert(*id);
                     }
                 }
             }
@@ -126,11 +127,8 @@ impl Tile<Sprite> {
 
             for (direction, maybe) in grid.get_neighbors(x, y) {
                 if let Some(value) = maybe {
-                    if !tile.neighbors[direction].contains(value) {
-                        tile.neighbors[direction].push(*value);
-                        tile.neighbors[direction].sort();
-                        assert!(!tile.neighbors[direction].is_empty());
-                    }
+                    tile.neighbors[direction].insert(*value);
+                    assert!(!tile.neighbors[direction].is_empty());
                 }
             }
 
@@ -172,7 +170,7 @@ impl<T> Tile<T> {
 impl<T: Clone> Collapsable for Tile<T> {
     type Identifier = u64;
 
-    fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool {
+    fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool {
         for (direction, tiles) in neighbors {
             if tiles.is_empty() {
                 continue;
@@ -180,16 +178,7 @@ impl<T: Clone> Collapsable for Tile<T> {
 
             let possible = &self.neighbors[direction];
 
-            let mut found = false;
-
-            for tile in tiles {
-                if possible.contains(tile) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if !found {
+            if possible.is_disjoint(tiles) {
                 return false;
             }
         }

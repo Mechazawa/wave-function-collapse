@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashSet};
 
 use log::trace;
 use rand::seq::{IteratorRandom, SliceRandom};
@@ -8,7 +8,8 @@ use rand_xorshift::XorShiftRng;
 use crate::grid::{Grid, Neighbors, Position};
 use crate::superstate::{Collapsable, SuperState};
 
-type CellNeighbors<T> = Option<Neighbors<Vec<<T as Collapsable>::Identifier>>>;
+type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
+pub type Set<T> = HashSet<T>;
 
 #[derive(Debug, PartialEq, Eq)]
 enum CollapseReason {
@@ -96,8 +97,8 @@ where
 
         if self.data.get(x, y).unwrap().is_none() {
             let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
-                None => Vec::new(),
-                Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
+                None => Set::new(),
+                Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
             });
 
             self.data.set(x, y, Some(data)).unwrap();
@@ -209,14 +210,14 @@ where
                 None => {
                     let mut neighbors = Neighbors::default();
 
-                    neighbors[direction.invert()] = possible_states.clone();
+                    neighbors[direction.invert()] = possible_states.clone().into_iter().collect();
 
                     self.data.set(x, y, Some(neighbors)).unwrap();
 
                     self.stack.push_back((x, y));
                 }
                 Some(neighbors) => {
-                    neighbors[direction.invert()] = possible_states.clone();
+                    neighbors[direction.invert()] = possible_states.clone().into_iter().collect();
                 }
             }
         }
