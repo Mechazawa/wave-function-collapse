@@ -207,6 +207,8 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
+    use rand::{thread_rng, RngCore};
+
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -259,8 +261,7 @@ fn main() {
 
     let max_progress = grid.size() as u64;
     let progress = ProgressBar::new(grid.size() as u64);
-    // let mut wfc = WaveFuncCollapse::new(grid, seed);
-    let mut wfc = Wave::new(grid);
+    let mut wfc = Wave::new(grid, seed);
 
     progress.enable_steady_tick(Duration::from_millis(200));
     progress.set_style(
