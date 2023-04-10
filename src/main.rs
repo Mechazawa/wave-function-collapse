@@ -192,7 +192,7 @@ struct Opt {
     completions: Option<Shell>,
 
     #[cfg(feature = "sdl2")]
-    #[structopt(short, long, help = "Render every step during visualisation")]
+    #[structopt(long, help = "Render every step during visualisation")]
     slow: bool,
 }
 
