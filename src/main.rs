@@ -80,12 +80,11 @@ struct SdlDraw {
     canvas: Canvas<Window>,
     events: EventPump,
     pub textures: HashMap<u64, Texture>,
-    prev_entropy: Grid<usize>,
 }
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size, grid_size: Size, tiles: &Vec<Tile<Sprite>>, vsync: bool) -> Self {
+    pub fn new(size: Size, tiles: &Vec<Tile<Sprite>>, vsync: bool) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
@@ -134,7 +133,6 @@ impl SdlDraw {
             canvas,
             events,
             textures,
-            prev_entropy: Grid::new(grid_size.width, grid_size.height, &mut |_, _| 0),
         }
     }
 }
@@ -282,7 +280,6 @@ fn main() {
 
         Some(SdlDraw::new(
             size,
-            opt.output_size.clone(),
             &tiles,
             opt.vsync,
         ))
@@ -373,17 +370,9 @@ fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
         .image
         .dimensions();
 
-    // context.canvas.clear();
+    context.canvas.clear();
 
     for (x, y, cell) in &wfc.grid {
-        let prev_entropy = *context.prev_entropy.get(x, y).unwrap();
-
-        context.prev_entropy.set(x, y, cell.entropy()).unwrap();
-
-        if cell.entropy() == prev_entropy {
-            continue;
-        }
-
         if let Some(tile) = cell.collapsed() {
             // todo streamline
             let texture = context.textures.get(&tile.get_id()).unwrap();
