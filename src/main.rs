@@ -3,6 +3,7 @@ mod sprite;
 mod superstate;
 mod tile;
 mod wave;
+mod window;
 
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
 use image::{ImageError, RgbaImage};
@@ -34,19 +35,8 @@ use tile::Tile;
 use crate::grid::Grid;
 use wave::Wave;
 
-#[cfg(feature = "sdl2")]
-use {
-    sdl2::event::Event,
-    sdl2::keyboard::Keycode,
-    sdl2::pixels::{Color, PixelFormatEnum},
-    sdl2::rect::Rect,
-    sdl2::render::{Canvas, Texture},
-    sdl2::video::Window,
-    sdl2::EventPump,
-    sprite::Sprite,
-    std::collections::HashMap,
-    superstate::Collapsable,
-};
+#[cfg(feature = "display")]
+use {sprite::Sprite, superstate::Collapsable};
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -72,68 +62,6 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
         Ok(Input::Config(configs))
     } else {
         Err("Failed to load input")
-    }
-}
-
-#[cfg(feature = "sdl2")]
-struct SdlDraw {
-    canvas: Canvas<Window>,
-    events: EventPump,
-    pub textures: HashMap<u64, Texture>,
-}
-
-#[cfg(feature = "sdl2")]
-impl SdlDraw {
-    pub fn new(size: Size, tiles: &Vec<Tile<Sprite>>, vsync: bool) -> Self {
-        let context = sdl2::init().unwrap();
-        let video = context.video().unwrap();
-
-        let window = video
-            .window("Wave Function Collapse", size.width as u32, size.height as u32)
-            .position_centered()
-            .build()
-            .map_err(|e| e.to_string())
-            .unwrap();
-
-        let mut builder = window.into_canvas().target_texture();
-
-        if vsync {
-            builder = builder.present_vsync();
-        }
-
-        let canvas = builder.build().map_err(|e| e.to_string()).unwrap();
-
-        let events = context.event_pump().unwrap();
-        let texture_creator = canvas.texture_creator();
-        let mut textures = HashMap::new();
-
-        for tile in tiles {
-            if textures.contains_key(&tile.get_id()) {
-                continue;
-            }
-
-            let rgba = tile.value.image.to_rgba8();
-            let (width, height) = tile.value.image.dimensions();
-
-            let mut texture = texture_creator
-                .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
-                .map_err(|e| e.to_string())
-                .unwrap();
-
-            texture
-                .with_lock(None, |buffer: &mut [u8], _: usize| {
-                    buffer.copy_from_slice(&rgba);
-                })
-                .unwrap();
-
-            textures.insert(tile.get_id(), texture);
-        }
-
-        Self {
-            canvas,
-            events,
-            textures,
-        }
     }
 }
 
@@ -183,19 +111,19 @@ struct Opt {
     #[structopt(parse(try_from_str), short, long, help = "Random seed (unstable)")]
     seed: Option<u64>,
 
-    #[cfg(feature = "sdl2")]
+    #[cfg(feature = "display")]
     #[structopt(short = "V", long, help = "Open a window to show the generation")]
     visual: bool,
 
-    #[cfg(feature = "sdl2")]
+    #[cfg(feature = "display")]
     #[structopt(long, help = "Render every step during visualisation")]
     slow: bool,
 
-    #[cfg(feature = "sdl2")]
-    #[structopt(long, help = "Turns on vsync")]
-    vsync: bool,
+    #[cfg(feature = "display")]
+    #[structopt(long, help = "Sync frames with ticks")]
+    sync: bool,
 
-    #[cfg(feature = "sdl2")]
+    #[cfg(feature = "display")]
     #[structopt(long, help = "Hold the image for n seconds after finishing")]
     hold: Option<f32>,
 
@@ -205,6 +133,8 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
+    use ggez::conf;
+
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -269,8 +199,8 @@ fn main() {
             .progress_chars("#>-"),
     );
 
-    #[cfg(feature = "sdl2")]
-    let mut sdl_draw = if opt.visual {
+    #[cfg(feature = "display")]
+    let mut draw_context = if opt.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
         let mut size = opt.output_size.clone();
 
@@ -278,11 +208,11 @@ fn main() {
 
         size.scale(tile_width.try_into().unwrap());
 
-        Some(SdlDraw::new(
-            size,
-            &tiles,
-            opt.vsync,
-        ))
+        let builder = ggez::ContextBuilder::new("Wave Function Collapse", "Mechazawa").window_mode(
+            conf::WindowMode::default().dimensions(size.width as f32, size.height as f32),
+        );
+
+        Some(&mut builder.build().unwrap())
     } else {
         None
     };
@@ -290,7 +220,7 @@ fn main() {
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
 
-        #[cfg(feature = "sdl2")]
+        #[cfg(feature = "display")]
         if let Some(draw) = sdl_draw.as_mut() {
             for event in draw.events.poll_iter() {
                 match event {
@@ -306,28 +236,28 @@ fn main() {
             update_canvas(&wfc, draw);
         }
 
-        #[cfg(feature = "sdl2")]
+        #[cfg(feature = "display")]
         if opt.slow {
             wfc.tick_once();
         } else {
             wfc.tick();
         }
 
-        #[cfg(not(feature = "sdl2"))]
+        #[cfg(not(feature = "display"))]
         wfc.tick();
     }
 
-    #[cfg(feature = "sdl2")]
+    #[cfg(feature = "display")]
     if let Some(draw) = sdl_draw.as_mut() {
         update_canvas(&wfc, draw);
     }
 
     progress.finish();
 
-    #[cfg(feature = "sdl2")]
+    #[cfg(feature = "display")]
     if let Some(delay) = opt.hold {
         info!("Waiting for {} seconds", delay);
-        
+
         std::thread::sleep(Duration::from_secs_f32(delay));
     }
 
@@ -360,52 +290,4 @@ fn main() {
     trace!("Writing output");
 
     canvas.save(opt.output.unwrap().as_path()).unwrap();
-}
-
-// todo only draw updated
-#[cfg(feature = "sdl2")]
-fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
-    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
-        .value
-        .image
-        .dimensions();
-
-    context.canvas.clear();
-
-    for (x, y, cell) in &wfc.grid {
-        if let Some(tile) = cell.collapsed() {
-            // todo streamline
-            let texture = context.textures.get(&tile.get_id()).unwrap();
-            let rect = Rect::new(
-                x as i32 * tile_width as i32,
-                y as i32 * tile_height as i32,
-                tile_width,
-                tile_height,
-            );
-            context.canvas.set_draw_color(Color::GRAY);
-            context.canvas.fill_rect(rect).unwrap();
-            context.canvas.copy(texture, None, Some(rect)).unwrap();
-        } else {
-            let color = if cell.entropy() > 0 {
-                let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
-                let value = (255.0 * (1.0 - ratio)) as u8;
-
-                Color::RGB(0, value / 3, value / 2)
-            } else {
-                Color::RED
-            };
-
-            let rect = Rect::new(
-                x as i32 * tile_width as i32,
-                y as i32 * tile_height as i32,
-                tile_width,
-                tile_height,
-            );
-
-            context.canvas.set_draw_color(color);
-            context.canvas.fill_rect(rect).unwrap();
-        }
-    }
-
-    context.canvas.present();
 }
