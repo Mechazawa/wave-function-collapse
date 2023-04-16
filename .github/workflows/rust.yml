@@ -17,6 +17,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Cargo cache
         uses: actions/cache@v2
         with:
@@ -62,6 +63,7 @@ jobs:
       TARGET: ${{ matrix.TARGET }}
       OS: ${{ matrix.OS }}
     steps:
+      - uses: actions/checkout@v2
       - name: Cargo cache
         uses: actions/cache@v2
         with:
