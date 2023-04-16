@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::thread;
+use std::time::Duration;
 
 use ggez::event::EventHandler;
 use ggez::glam::Vec2;
@@ -113,11 +115,19 @@ impl<T:Collapsable> Window<T> {
 }
 
 impl<T: Collapsable> EventHandler for Window<T> {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
         if self.config.slow {
             self.tick_once();
         } else {
             self.tick();
+        }
+
+        if self.wfc.done() {
+            if let Some(secs) = self.config.hold {
+                thread::sleep(Duration::from_secs_f32(secs))
+            }
+
+            ctx.request_quit();
         }
 
         Ok(())

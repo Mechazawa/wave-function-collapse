@@ -16,7 +16,6 @@ use rand::rngs::OsRng;
 use rand::Rng;
 
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-use window::WindowConfig;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
@@ -27,14 +26,17 @@ use std::{io, usize};
 use structopt::clap::Shell;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
-use tile::TileConfig;
 
+
+use tile::TileConfig;
 use grid::Size;
 use superstate::SuperState;
 use tile::Tile;
-
-use crate::grid::Grid;
+use grid::Grid;
 use wave::Wave;
+
+#[cfg(feature = "display")]
+use window::{Window, WindowConfig};
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -122,10 +124,6 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
-    use ggez::{conf, event};
-
-    use crate::window::Window;
-
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -176,7 +174,7 @@ fn main() {
 
     info!("Using seed: {}", seed);
 
-    let wfc = Wave::new(grid, seed);
+    let mut wfc = Wave::new(grid, seed);
 
     #[cfg(feature = "display")]
     let draw_context = if opt.visual {
@@ -190,9 +188,9 @@ fn main() {
         println!("{:?}", size);
 
         let builder = ggez::ContextBuilder::new("Wave Function Collapse", "Mechazawa").window_mode(
-            conf::WindowMode::default()
+            ggez::conf::WindowMode::default()
                 .dimensions(size.width as f32, size.height as f32)
-                .resizable(false),
+                .resizable(false)
         );
 
         Some(builder.build().unwrap())
@@ -205,7 +203,7 @@ fn main() {
     if let Some((mut context, event_loop)) = draw_context {
         let window = Window::new(&mut context, &tiles, wfc, opt.window);
 
-        event::run(context, event_loop, window);
+        ggez::event::run(context, event_loop, window);
     }
 
     let max_progress = wfc.grid.size() as u64;
@@ -221,28 +219,17 @@ fn main() {
             .progress_chars("#>-"),
     );
 
-    #[cfg(not(feature = "display"))]
+    if !wfc.done() && opt.window.slow {
+        warn!("Ignoring slow mode");
+    }
+
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
 
         wfc.tick();
     }
 
-    #[cfg(not(feature = "display"))]
-    if opt.slow {
-        wfc.tick_once();
-    } else {
-        wfc.tick();
-    }
-
     progress.finish();
-
-    #[cfg(feature = "display")]
-    if let Some(delay) = opt.window.hold {
-        info!("Waiting for {} seconds", delay);
-
-        std::thread::sleep(Duration::from_secs_f32(delay));
-    }
 
     info!("Drawing output");
     if opt.output.is_none() {
