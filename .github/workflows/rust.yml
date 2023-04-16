@@ -99,7 +99,7 @@ jobs:
       - name: Install rust target
         run: rustup target add $TARGET
       - name: Run build
-        run: cargo build --release --verbose --target $TARGET
+        run: PKG_CONFIG_SYSROOT_DIR=/ cargo build --release --verbose --target $TARGET
       - name: List target
         run: find ./target
       - name: Compress
