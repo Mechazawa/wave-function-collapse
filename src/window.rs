@@ -1,65 +1,83 @@
 use std::collections::HashMap;
 
-use ggez::GameResult;
 use ggez::event::EventHandler;
 use ggez::glam::Vec2;
 use ggez::graphics;
 use ggez::graphics::Color;
 use ggez::graphics::Image;
 use ggez::Context;
+use ggez::GameResult;
+use structopt::StructOpt;
 
-use crate::grid::Grid;
+use crate::wave::Wave;
 use crate::sprite::Sprite;
-use crate::superstate::{Collapsable, SuperState};
 use crate::tile::Tile;
+use crate::superstate::Collapsable;
 
-pub struct Window<'a, T: Clone> {
-    sprites: HashMap<u64, Image>,
-    grid: &'a Grid<SuperState<Tile<T>>>,
+#[derive(Default, Clone, Copy, Debug, StructOpt)]
+pub struct WindowConfig {
+    #[structopt(long, help = "Render every step during visualisation")]
+    pub slow: bool,
+
+    #[structopt(long, help = "Sets max fps")]
+    pub max_fps: Option<u32>,
+
+    #[structopt(long, help = "Hold the image for n seconds after finishing")]
+    pub hold: Option<f32>,
 }
 
-impl<'a, T: Clone> Window<'a, T> {
+pub struct Window<T: Collapsable> {
+    pub sprites: HashMap<T::Identifier, Image>,
+    pub wfc: Wave<T>,
+    config: WindowConfig,
+}
+
+impl Window<Tile<Sprite>> {
     pub fn new(
         ctx: &mut Context,
         tiles: &Vec<Tile<Sprite>>,
-        grid: &Grid<SuperState<Tile<T>>>,
+        wfc: Wave<Tile<Sprite>>,
+        config: WindowConfig
     ) -> Self {
         let mut sprites = HashMap::new();
 
         for tile in tiles {
             let id = tile.get_id();
-            let sprite = tile.value.into_image(ctx);
+            let sprite = tile.value.clone().into_image(ctx);
 
             sprites.insert(id, sprite);
         }
 
-        Self { sprites, grid }
+        Self { sprites, wfc, config }
     }
 }
 
-impl<'a, T: Clone> EventHandler for Window<'a, T> {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        Ok(())
-    }
+impl<T:Collapsable> Window<T> {
+    pub fn draw_context(&mut self, ctx: &mut Context) -> GameResult {
+        let (width, height) = ctx.gfx.drawable_size();
+        let tile_width = width / self.wfc.grid.width() as f32;
+        let tile_height = height / self.wfc.grid.height() as f32;
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        let (width, height) = ctx.gfx.size();
-        let tile_width = width / self.grid.width() as f32;
-        let tile_height = height / self.grid.height() as f32;
+        let mut canvas = graphics::Canvas::from_frame(
+            ctx,
+            // graphics::Color::from([0.1, 0.2, 0.3, 1.0]),
+            Color::BLACK,
+        );
 
-        let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::BLACK);
-        
-        for (x, y, cell) in self.grid {
+        for (x, y, cell) in &self.wfc.grid {
             let pos = Vec2::new(
                 (x as f32 * tile_width).into(),
                 (y as f32 * tile_height).into(),
             );
 
+            assert!(pos.x <= width);
+            assert!(pos.y <= height);
+
             if let Some(tile) = cell.collapsed() {
                 let sprite = self.sprites.get(&tile.get_id()).unwrap();
-
+                
                 canvas.draw(sprite, pos);
-            } else {
+            } else if cell.collapsing() {
                 let color = if cell.entropy() > 0 {
                     let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
                     let value = (255.0 * (1.0 - ratio)) as u8;
@@ -68,7 +86,7 @@ impl<'a, T: Clone> EventHandler for Window<'a, T> {
                 } else {
                     Color::RED
                 };
-
+                
                 let mesh = graphics::Mesh::new_rectangle(
                     ctx,
                     graphics::DrawMode::fill(),
@@ -76,12 +94,36 @@ impl<'a, T: Clone> EventHandler for Window<'a, T> {
                     color,
                 )?;
 
-                canvas.draw(&mesh, pos);
+                canvas.draw(&mesh,  pos);
             }
         }
 
         canvas.finish(ctx)?;
 
         Ok(())
+    }
+
+    pub fn tick(&mut self) {
+        self.wfc.tick();
+    }
+
+    pub fn tick_once(&mut self) {
+        self.wfc.tick_once();
+    }
+}
+
+impl<T: Collapsable> EventHandler for Window<T> {
+    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+        if self.config.slow {
+            self.tick_once();
+        } else {
+            self.tick();
+        }
+
+        Ok(())
+    }
+
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        self.draw_context(ctx)
     }
 }

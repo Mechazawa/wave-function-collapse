@@ -16,6 +16,7 @@ use rand::rngs::OsRng;
 use rand::Rng;
 
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use window::WindowConfig;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
@@ -34,9 +35,6 @@ use tile::Tile;
 
 use crate::grid::Grid;
 use wave::Wave;
-
-#[cfg(feature = "display")]
-use {sprite::Sprite, superstate::Collapsable};
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -95,7 +93,6 @@ struct Opt {
     #[structopt(
         parse(from_os_str),
         help = "Output image",
-        required_unless = "completions"
     )]
     output: Option<PathBuf>,
 
@@ -104,7 +101,7 @@ struct Opt {
         short,
         long,
         default_value = "20x20",
-        help = "Output image grid size"
+        help = "Output image grid size",
     )]
     output_size: Size,
 
@@ -116,16 +113,8 @@ struct Opt {
     visual: bool,
 
     #[cfg(feature = "display")]
-    #[structopt(long, help = "Render every step during visualisation")]
-    slow: bool,
-
-    #[cfg(feature = "display")]
-    #[structopt(long, help = "Sync frames with ticks")]
-    sync: bool,
-
-    #[cfg(feature = "display")]
-    #[structopt(long, help = "Hold the image for n seconds after finishing")]
-    hold: Option<f32>,
+    #[structopt(flatten)]
+    window: WindowConfig,
 
     #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
@@ -133,7 +122,9 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
-    use ggez::conf;
+    use ggez::{conf, event};
+
+    use crate::window::Window;
 
     let opt: Opt = Opt::from_args();
 
@@ -185,9 +176,40 @@ fn main() {
 
     info!("Using seed: {}", seed);
 
-    let max_progress = grid.size() as u64;
-    let progress = ProgressBar::new(grid.size() as u64);
-    let mut wfc = Wave::new(grid, seed);
+    let wfc = Wave::new(grid, seed);
+
+    #[cfg(feature = "display")]
+    let draw_context = if opt.visual {
+        let (tile_width, tile_height) = tiles[0].value.image.dimensions();
+        let mut size = opt.output_size;
+
+        assert_eq!(tile_width, tile_height);
+
+        size.scale(tile_width.try_into().unwrap());
+
+        println!("{:?}", size);
+
+        let builder = ggez::ContextBuilder::new("Wave Function Collapse", "Mechazawa").window_mode(
+            conf::WindowMode::default()
+                .dimensions(size.width as f32, size.height as f32)
+                .resizable(false),
+        );
+
+        Some(builder.build().unwrap())
+    } else {
+        None
+    };
+
+
+    #[cfg(feature = "display")]
+    if let Some((mut context, event_loop)) = draw_context {
+        let window = Window::new(&mut context, &tiles, wfc, opt.window);
+
+        event::run(context, event_loop, window);
+    }
+
+    let max_progress = wfc.grid.size() as u64;
+    let progress = ProgressBar::new(max_progress);
 
     progress.enable_steady_tick(Duration::from_millis(200));
     progress.set_style(
@@ -199,63 +221,24 @@ fn main() {
             .progress_chars("#>-"),
     );
 
-    #[cfg(feature = "display")]
-    let mut draw_context = if opt.visual {
-        let (tile_width, tile_height) = tiles[0].value.image.dimensions();
-        let mut size = opt.output_size.clone();
-
-        assert_eq!(tile_width, tile_height);
-
-        size.scale(tile_width.try_into().unwrap());
-
-        let builder = ggez::ContextBuilder::new("Wave Function Collapse", "Mechazawa").window_mode(
-            conf::WindowMode::default().dimensions(size.width as f32, size.height as f32),
-        );
-
-        Some(&mut builder.build().unwrap())
-    } else {
-        None
-    };
-
+    #[cfg(not(feature = "display"))]
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
 
-        #[cfg(feature = "display")]
-        if let Some(draw) = sdl_draw.as_mut() {
-            for event in draw.events.poll_iter() {
-                match event {
-                    Event::Quit { .. }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::Escape),
-                        ..
-                    } => return,
-                    _ => {}
-                }
-            }
-
-            update_canvas(&wfc, draw);
-        }
-
-        #[cfg(feature = "display")]
-        if opt.slow {
-            wfc.tick_once();
-        } else {
-            wfc.tick();
-        }
-
-        #[cfg(not(feature = "display"))]
         wfc.tick();
     }
 
-    #[cfg(feature = "display")]
-    if let Some(draw) = sdl_draw.as_mut() {
-        update_canvas(&wfc, draw);
+    #[cfg(not(feature = "display"))]
+    if opt.slow {
+        wfc.tick_once();
+    } else {
+        wfc.tick();
     }
 
     progress.finish();
 
     #[cfg(feature = "display")]
-    if let Some(delay) = opt.hold {
+    if let Some(delay) = opt.window.hold {
         info!("Waiting for {} seconds", delay);
 
         std::thread::sleep(Duration::from_secs_f32(delay));

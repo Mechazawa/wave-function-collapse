@@ -22,11 +22,12 @@ impl Hash for Sprite {
 }
 
 impl Sprite {
+    #[cfg(feature = "display")]
     pub fn into_image(self, ctx: &mut Context) -> Image {
         let (width, height) = self.image.dimensions();
         let rgba = self.image.to_rgba8();
         let rgba_data = rgba.as_raw();
 
-        Image::from_pixels(ctx, &rgba_data, ImageFormat::Rgba8Sint, width, height)
+        Image::from_pixels(ctx, rgba_data, ImageFormat::Rgba8UnormSrgb, width, height)
     }
 }

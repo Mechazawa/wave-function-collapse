@@ -8,7 +8,7 @@ license = "CC0"
 
 [dependencies]
 enum-map = "2.5"
-ggez = { version = "0.8.1", features = ["c_dependencies"], optional = true }
+ggez = {  git = 'https://github.com/ggez/ggez.git', branch = "devel", features = ["c_dependencies"], optional = true }
 image = { version = "0.24", optional = true }
 imageproc = { version = "0.23", optional = true }
 indicatif = "0.17"
