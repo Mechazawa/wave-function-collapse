@@ -19,6 +19,7 @@ where
 {
     pub possible: Vec<Rc<T>>,
     base_entropy: usize,
+    entropy: usize,
 }
 
 impl<T> SuperState<T>
@@ -31,6 +32,7 @@ where
         Self {
             possible,
             base_entropy,
+            entropy: base_entropy
         }
     }
 
@@ -43,7 +45,11 @@ where
     }
 
     pub fn entropy(&self) -> usize {
-        self.possible.len()
+        self.entropy
+    }
+
+    fn update_entropy(&mut self) {
+        self.entropy = self.possible.len();
     }
 
     pub fn collapsed(&self) -> Option<Rc<T>> {
@@ -60,13 +66,13 @@ where
                 .choose_weighted(rng, |v| v.get_weight())
                 .unwrap()
                 .clone()];
+
+            self.update_entropy();
         }
     }
 
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
-        let entropy = self.entropy();
-
-        if neighbors.len() > 0 && entropy > 1 {
+        if neighbors.len() > 0 && self.entropy() > 1 {
             // self.possible.retain(|v| v.test(neighbors));
 
             // This is faster than retaining
@@ -79,5 +85,7 @@ where
                 }
             }
         }
+
+        self.update_entropy();
     }
 }
