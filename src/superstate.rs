@@ -62,7 +62,7 @@ where
     }
 
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
-        if self.entropy() > 1 {
+        if self.possible.len() > 1 {
             self.possible = vec![self
                 .possible
                 .choose_weighted(rng, |v| v.get_weight())
