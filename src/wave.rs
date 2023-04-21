@@ -55,6 +55,8 @@ where
     data: Grid<CellNeighbors<T>>,
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
+    last_rollback: usize,
+    rollback_penalty: usize,
 }
 
 impl<T> Wave<T>
@@ -69,6 +71,8 @@ where
             grid_base: grid.clone(),
             grid,
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
+            last_rollback: 0,
+            rollback_penalty: 0,
         }
     }
 
@@ -146,7 +150,7 @@ where
         }
 
         if cell.entropy() == 0 {
-            self.rollback(1);
+            self.smart_rollback();
         } else if old_entropy != cell.entropy() {
             self.mark(x, y);
         }
@@ -260,6 +264,54 @@ where
         }
     }
 
+    fn smart_rollback(&mut self) {
+        let collapsed_count = self.grid.size() - self.remaining();
+
+        trace!("Collapsed: {}", collapsed_count);
+
+        if collapsed_count <= self.last_rollback {
+            self.rollback_penalty += 1;
+        } else {
+            self.last_rollback = collapsed_count;
+            self.rollback_penalty = 1;
+        }
+
+        self.rollback(self.rollback_penalty);
+
+        if self.collapsed.len() == 0 {
+            self.rollback_penalty = 1;
+        }
+    }
+
+    fn rollback(&mut self, mut count: usize) {
+        trace!("Rollback {count}");
+
+        if count == 0 {
+            return;
+        }
+
+        // empty stack
+        self.stack.clear();
+        self.data = Grid::new(self.grid.width(), self.grid.height(), &mut |_, _| {
+            Default::default()
+        });
+
+        // revert last step of collapse stack
+        while let Some(((x, y), reason)) = self.collapsed.pop() {
+            self.rollback_propegate(x, y, None);
+
+            self.stack.push_front((x, y));
+
+            if reason == CollapseReason::Explicit {
+                count -= 1;
+
+                if count == 0 {
+                    break;
+                }
+            }
+        }
+    }
+
     fn rollback_propegate(&mut self, x: usize, y: usize, from: Option<Direction>) {
         // set state to base state
         let base = self.grid_base.get(x, y).unwrap().clone();
@@ -298,35 +350,6 @@ where
 
                 if entropy != new_entropy {
                     self.rollback_propegate(nx, ny, Some(direction.invert()));
-                }
-            }
-        }
-    }
-
-    fn rollback(&mut self, mut count: usize) {
-        trace!("Rollback {count}");
-
-        if count == 0 {
-            return;
-        }
-
-        // empty stack
-        self.stack.clear();
-        self.data = Grid::new(self.grid.width(), self.grid.height(), &mut |_, _| {
-            Default::default()
-        });
-
-        // revert last step of collapse stack
-        while let Some(((x, y), reason)) = self.collapsed.pop() {
-            self.rollback_propegate(x, y, None);
-
-            self.stack.push_front((x, y));
-
-            if reason == CollapseReason::Explicit {
-                count -= 1;
-
-                if count == 0 {
-                    break;
                 }
             }
         }
