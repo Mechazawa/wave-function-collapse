@@ -180,6 +180,7 @@ where
     }
 
     pub fn collapse_edge(&mut self) -> Option<Position> {
+        // todo this is slow, try and do it in a single loop
         // get lowest entropy
         let positions: Vec<_> = self
             .grid
