@@ -1,5 +1,5 @@
 use core::str::FromStr;
-use enum_map::{Enum, EnumMap, enum_map};
+use enum_map::{enum_map, Enum, EnumMap};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]
 pub enum Direction {
@@ -54,7 +54,7 @@ impl Size {
     }
 
     pub fn uniform(size: usize) -> Self {
-        Self { 
+        Self {
             width: size,
             height: size,
         }
@@ -63,21 +63,33 @@ impl Size {
 
 #[derive(Debug, Clone)]
 pub struct Grid<T>
-where T: Clone {
+where
+    T: Clone,
+{
     data: Vec<T>,
     width: usize,
     height: usize,
 }
 
 pub struct GridIter<'a, T>
-where T: Clone  {
+where
+    T: Clone,
+{
     grid: &'a Grid<T>,
     pos: usize,
+    x: usize,
+    y: usize,
 }
 
-impl<T> Grid<T> 
-where T: Clone {
-    pub fn new<F: FnMut(usize, usize) -> T>(width: usize, height: usize, initializer: &mut F) -> Self {
+impl<T> Grid<T>
+where
+    T: Clone,
+{
+    pub fn new<F: FnMut(usize, usize) -> T>(
+        width: usize,
+        height: usize,
+        initializer: &mut F,
+    ) -> Self {
         let mut data = Vec::with_capacity(width * height);
 
         for y in 0..height {
@@ -98,7 +110,12 @@ where T: Clone {
     }
 
     pub fn iter(&self) -> GridIter<T> {
-        GridIter { grid: self, pos: 0 }
+        GridIter {
+            grid: self,
+            pos: 0,
+            x: 0,
+            y: 0,
+        }
     }
 
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
@@ -143,7 +160,12 @@ where T: Clone {
         }
     }
 
-    pub fn get_neighbor_position(&self, x: usize, y: usize, direction: Direction) -> Option<Position> {
+    pub fn get_neighbor_position(
+        &self,
+        x: usize,
+        y: usize,
+        direction: Direction,
+    ) -> Option<Position> {
         match direction {
             Direction::Up => {
                 if y == 0 {
@@ -178,7 +200,7 @@ where T: Clone {
 
     pub fn get_neighbor(&self, x: usize, y: usize, direction: Direction) -> Option<&T> {
         let (lx, ly) = self.get_neighbor_position(x, y, direction)?;
-        
+
         self.get(lx, ly)
     }
 
@@ -192,7 +214,9 @@ where T: Clone {
 }
 
 impl<'a, T> IntoIterator for &'a Grid<T>
-where T: Clone  {
+where
+    T: Clone,
+{
     type Item = (usize, usize, &'a T);
     type IntoIter = GridIter<'a, T>;
 
@@ -201,17 +225,26 @@ where T: Clone  {
     }
 }
 
-impl<'a, T> Iterator for GridIter<'a, T> 
-where T: Clone {
+impl<'a, T> Iterator for GridIter<'a, T>
+where
+    T: Clone,
+{
     type Item = (usize, usize, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.grid.data.len() {
             None
         } else {
-            let x = self.pos % self.grid.width;
-            let y = self.pos / self.grid.width;
             let value = &self.grid.data[self.pos];
+            let x = self.x;
+            let y = self.y;
+
+            self.x += 1;
+
+            if self.x >= self.grid.width() {
+                self.x = 0;
+                self.y += 1;
+            }
 
             self.pos += 1;
 
