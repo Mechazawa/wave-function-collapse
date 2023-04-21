@@ -232,7 +232,7 @@ where
     }
 
     fn mark(&mut self, cx: usize, cy: usize) {
-        let possible_states: Vec<T::Identifier> = self
+        let raw_possible_states: Vec<T::Identifier> = self
             .grid
             .get(cx, cy)
             .unwrap()
@@ -240,6 +240,8 @@ where
             .iter()
             .map(|t| t.get_id())
             .collect();
+
+        let possible_states: Set<T::Identifier> = raw_possible_states.into_iter().collect();
 
         for (direction, pos) in self.data.get_neighbor_positions(cx, cy) {
             if pos.is_none() {
@@ -251,14 +253,14 @@ where
                 None => {
                     let mut neighbors = Neighbors::default();
 
-                    neighbors[direction.invert()] = possible_states.clone().into_iter().collect();
+                    neighbors[direction.invert()] = possible_states.clone();
 
                     self.data.set(x, y, Some(neighbors)).unwrap();
 
                     self.stack.push_back((x, y));
                 }
                 Some(neighbors) => {
-                    neighbors[direction.invert()] = possible_states.clone().into_iter().collect();
+                    neighbors[direction.invert()] = possible_states.clone();
                 }
             }
         }
