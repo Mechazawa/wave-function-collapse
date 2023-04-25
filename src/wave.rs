@@ -31,7 +31,7 @@ impl BuildHasher for NoOpHasher {
     type Hasher = Self;
 
     fn build_hasher(&self) -> Self::Hasher {
-        self.clone()
+        *self
     }
 }
 
@@ -82,18 +82,6 @@ where
 
     pub fn remaining(&self) -> usize {
         self.grid.size() - self.collapsed.len()
-    }
-
-    pub fn maybe_collapse(&mut self) -> Option<Position> {
-        let pos = self.collapse_edge();
-
-        if pos.is_none() {
-            trace!("Failed to find edge to collapse");
-
-            self.collapse_any()
-        } else {
-            pos
-        }
     }
 
     #[allow(dead_code)]
@@ -162,73 +150,37 @@ where
         self.mark(x, y);
     }
 
-    pub fn collapse_any(&mut self) -> Option<Position> {
-        let maybe = self
-            .grid
-            .iter()
-            .filter(|(_, _, cell)| cell.entropy() > 1)
-            .map(|(x, y, _)| (x, y))
-            .choose_stable(&mut self.rng);
+    pub fn maybe_collapse(&mut self) -> Option<Position> {
+        let mut options = Vec::new();
+        let mut lowest = usize::MAX;
+
+        for (x, y, cell) in &self.grid {
+            let entropy = cell.entropy();
+
+            if entropy <= 1 {
+                continue;
+            }
+            
+            if entropy < lowest {
+                options.clear();
+                lowest = entropy;
+            }
+            
+            if entropy == lowest {
+                options.push((x, y));
+            }
+        }
+            
+        let maybe = options.into_iter().choose_stable(&mut self.rng);
 
         match maybe {
             Some((x, y)) => {
                 self.collapse(x, y);
                 Some((x, y))
             }
-            None => None,
-        }
-    }
-
-    pub fn collapse_edge(&mut self) -> Option<Position> {
-        // todo this is slow, try and do it in a single loop
-        // get lowest entropy
-        let positions: Vec<_> = self
-            .grid
-            .iter()
-            .map(|(x, y, cell)| (x, y, cell.entropy()))
-            .collect();
-
-        let lowest = positions
-            .iter()
-            .map(|(_, _, e)| e)
-            .filter(|&&e| e > 1)
-            .min()
-            .unwrap_or(&0);
-
-        if *lowest == 0 {
-            return None;
-        }
-
-        // filter for edge
-        let mut choices: Vec<_> = positions
-            .iter()
-            .filter(|(_, _, entropy)| entropy == lowest)
-            .map(|&(x, y, _)| {
-                (
-                    x,
-                    y,
-                    self.grid
-                        .get_neighbors(x, y)
-                        .iter()
-                        .filter(|(_, s)| s.is_some() && s.unwrap().entropy() == 1)
-                        .count(),
-                )
-            })
-            .filter(|(_, _, n)| *n > 0)
-            .collect();
-
-        if choices.is_empty() {
-            None
-        } else {
-            choices.sort_by(|(_, _, a), (_, _, b)| b.cmp(a));
-
-            let &(x, y, _) = choices
-                .choose_weighted(&mut self.rng, |(_, _, n)| *n)
-                .unwrap();
-
-            self.collapse(x, y);
-
-            Some((x, y))
+            None => {
+                None
+            },
         }
     }
 
@@ -281,7 +233,7 @@ where
 
         self.rollback(self.rollback_penalty);
 
-        if self.collapsed.len() == 0 {
+        if self.collapsed.is_empty() {
             self.rollback_penalty = 1;
         }
     }

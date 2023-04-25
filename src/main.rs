@@ -272,7 +272,7 @@ fn main() {
     #[cfg(feature = "sdl2")]
     let mut sdl_draw = if opt.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
-        let mut size = opt.output_size.clone();
+        let mut size = opt.output_size;
 
         assert_eq!(tile_width, tile_height);
 
