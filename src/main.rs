@@ -16,7 +16,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::Instant;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
@@ -155,22 +154,21 @@ fn main() {
             grid[*index].tick(&neighbors);
         }
 
-        // sort the stack; entropy ascending
-        stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
-
         let mut stack_next = Vec::new();
 
         stack_next.reserve_exact(stack.len());
 
         for &id in &stack {
             match grid[id].entropy() {
-                0 => panic!("{} has no entropy left", id),
                 1 => collapse_stack.push((id, true)),
                 _ => stack_next.push(id),
             }
         }
 
         stack = stack_next;
+
+        // sort the stack; entropy ascending
+        stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
 
         if let Some(&lowest) = &stack.get(0) {
             if grid[lowest].entropy() == 0 {
@@ -235,6 +233,18 @@ fn main() {
             }
         }
 
-        canvas.save(opt.output.as_path()).unwrap();
+        // todo temporary for making animation
+        let file_name: String = opt.output.as_path().file_name().unwrap().to_string_lossy().into();
+
+        if file_name.contains("{}") {
+            let mut path = opt.output.clone();
+            let new_name = file_name.replace("{}", format!("{:05}", stack.len()).as_str());
+            
+            path.set_file_name(new_name);
+
+            canvas.save(path).unwrap();
+        } else {
+            canvas.save(opt.output.as_path()).unwrap();
+        }
     }
 }
