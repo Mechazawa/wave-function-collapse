@@ -10,6 +10,7 @@ license = "CC0"
 image = "0.24.6"
 log = "0.4.17"
 num-traits = "0.2.15"
+rand = "0.8.5"
 simplelog = { version = "0.12.1", features = ["paris"] }
 structopt = "0.3.26"
 structopt-flags = "0.3"

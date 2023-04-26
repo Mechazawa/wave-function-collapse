@@ -3,17 +3,36 @@ use image::GenericImageView;
 use image::ImageBuffer;
 use image::Pixel;
 use log::debug;
+use log::trace;
+use log::warn;
 use num_traits::cast::ToPrimitive;
+use rand::rngs::ThreadRng;
+use rand::seq::SliceRandom;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Size {
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Size {
+    pub fn area(&self) -> u32 {
+        self.width * self.height
+    }
+
+    pub fn get_offsets(&self) -> [(Direction, i32); 4] {
+        [
+            (Direction::Left, -1),
+            (Direction::Right, 1),
+            (Direction::Up, -(self.width as i32)),
+            (Direction::Down, self.width as i32),
+        ]
+    }
 }
 
 impl FromStr for Size {
@@ -41,32 +60,20 @@ pub enum Direction {
     Right,
 }
 #[derive(Debug, Clone)]
-pub struct Tile<T>
-where
-    T: GenericImageView,
-{
-    image: Rc<T>,
+pub struct Tile {
+    pub image: Rc<DynamicImage>,
     /// todo: neighbours per side
-    neighbors: HashMap<Direction, HashSet<Rc<Tile<T>>>>,
+    neighbors: HashMap<Direction, HashSet<Rc<Self>>>,
 }
 
-impl<T> Tile<T>
-where
-    T: GenericImageView,
-    DynamicImage: From<
-        ImageBuffer<
-            <T as GenericImageView>::Pixel,
-            Vec<<<T as GenericImageView>::Pixel as Pixel>::Subpixel>,
-        >,
-    >,
-{
-    pub fn get_tile_set(image: &T, grid_size: &Size) -> HashSet<Rc<Tile<DynamicImage>>> {
+impl Tile {
+    pub fn get_tile_set(image: &DynamicImage, grid_size: &Size) -> Vec<Rc<Self>> {
         let (image_width, image_height) = image.dimensions();
         let tile_width = image_width / grid_size.width;
         let tile_height = image_height / grid_size.height;
 
-        let mut output: HashSet<Rc<Tile<DynamicImage>>> = HashSet::new();
-        let mut grid: Vec<Rc<Tile<DynamicImage>>> = Vec::new();
+        let mut unique: HashSet<Rc<Self>> = HashSet::new();
+        let mut grid: Vec<Rc<Self>> = Vec::new();
 
         debug!("Generating tiles");
 
@@ -82,37 +89,42 @@ where
                     neighbors: HashMap::new(),
                 });
 
-                output.insert(Rc::clone(&new_tile));
+                unique.insert(new_tile.clone());
 
-                let tile = output.get(&new_tile).unwrap();
+                let tile = unique.get(&new_tile).unwrap();
 
-                grid.push(Rc::clone(&tile));
+                grid.push(tile.clone());
             }
         }
 
         debug!("Populating neighbors");
 
-        let offsets = [
-            (Direction::Left, -1), 
-            (Direction::Right, 1), 
-            (Direction::Up, -(grid_size.width as i32)), 
-            (Direction::Down, grid_size.width as i32)
-        ];
-
         for index in 0..grid.len() {
-            let mut tile_ref = Rc::clone(&grid[index]);
+            let mut tile_ref = grid[index].clone();
 
-            for (direction, offset) in offsets {
+            for (direction, offset) in grid_size.get_offsets() {
                 let target = index as i32 + offset;
 
-                if target >= 0 {
-                    if let Some(value) = grid.get(target as usize) {
-                        let tile = Rc::make_mut(&mut tile_ref);
+                if let Some(value) = grid.get(target as usize) {
+                    let tile = Rc::make_mut(&mut tile_ref);
 
-                        tile.neighbors.entry(direction).or_insert_with(HashSet::new).insert(Rc::clone(&value));
-                    }
+                    tile.neighbors
+                        .entry(direction)
+                        .or_insert_with(HashSet::new)
+                        .insert(Rc::clone(&value));
                 }
             }
+
+            assert!(tile_ref.neighbors.len() > 0);
+
+            // todo: ?????
+            unique.replace(tile_ref);
+        }
+
+        let output = unique.into_iter().collect::<Vec<Rc<Self>>>();
+
+        for tile in output.iter() {
+            assert!(tile.neighbors.len() > 0);
         }
 
         // todo: Keep track of rotation
@@ -121,10 +133,7 @@ where
     }
 }
 
-impl<T> Hash for Tile<T>
-where
-    T: GenericImageView,
-{
+impl Hash for Tile {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for pixel in self.image.pixels() {
             for channel in pixel.2.channels() {
@@ -136,10 +145,7 @@ where
     }
 }
 
-impl<T> PartialEq for Tile<T>
-where
-    T: GenericImageView,
-{
+impl PartialEq for Tile {
     fn eq(&self, other: &Self) -> bool {
         let mut s1 = DefaultHasher::new();
         let mut s2 = DefaultHasher::new();
@@ -150,4 +156,73 @@ where
         s1.finish() == s2.finish()
     }
 }
-impl<T> Eq for Tile<T> where T: GenericImageView {}
+impl Eq for Tile {}
+
+pub trait Collapsable {
+    fn test(&self, neighbors: &HashMap<Direction, Vec<Rc<Self>>>) -> bool;
+}
+
+impl Collapsable for Tile {
+    fn test(&self, neighbors: &HashMap<Direction, Vec<Rc<Self>>>) -> bool {
+        let mut valid = 0;
+            
+        assert!(self.neighbors.len() > 0);
+
+        for (direction, tiles) in neighbors {
+            let possible = match self.neighbors.get(direction) {
+                Some(v) => v,
+                None => {
+                    valid += 1;
+                    continue;
+                },
+            };
+
+            for tile in tiles {
+                if possible.contains(tile) {
+                    valid += 1;
+                    break;
+                }
+            }
+        }
+
+        assert!(valid <= neighbors.len());
+
+        valid == neighbors.len()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SuperState<T>
+where
+    T: Collapsable,
+{
+    pub possible: Vec<Rc<T>>,
+}
+
+impl<T> SuperState<T>
+where
+    T: Collapsable,
+{
+    pub fn entropy(&self) -> usize {
+        self.possible.len()
+    }
+
+    pub fn collapsed(&self) -> Option<Rc<T>> {
+        match self.possible.len() {
+            1 => Some(self.possible.get(0)?.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn collapse(&mut self, rng: &mut ThreadRng) {
+        self.possible = vec![self.possible.choose(rng).unwrap().clone()];
+    }
+
+    pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<Rc<T>>>) {
+        if self.entropy() > 1 {
+            self.possible.retain(|v| v.test(&neighbors));
+
+            assert!(self.entropy() > 0);
+        }
+    }
+}
