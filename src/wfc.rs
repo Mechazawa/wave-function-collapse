@@ -58,10 +58,10 @@ where
     pub fn tick(&mut self) {
         self.ticks += 1;
 
-        // todo: optimise to only test positions near collapsed
-        // test all positions        
+        // todo: optimise to only consider near previously changed, fixes large grid performance
+        // test all positions
         for &(x, y) in &self.stack {
-            let mut neighbors: Neighbors<Vec<u64>> = Default::default();
+            let mut neighbors: Neighbors<Vec<<T as Collapsable>::Key>> = Default::default();
             let mut do_test: bool = false;
 
             for (direction, maybe_cell) in self.grid.get_neighbors(x, y) {
@@ -76,22 +76,21 @@ where
             }
 
             if do_test {
-                self.grid.get_mut(x, y).unwrap().tick(self.ticks, &neighbors);
+                self.grid
+                    .get_mut(x, y)
+                    .unwrap()
+                    .tick(self.ticks, &neighbors);
             }
         }
 
-        let mut stack_next = Vec::new();
-
-        stack_next.reserve_exact(self.stack.len());
-
-        for (x, y) in &self.stack {
-            match self.grid.get(*x, *y).unwrap().entropy() {
-                1 => self.collapse_stack.push((*x, *y, true)),
-                _ => stack_next.push((*x, *y)),
-            }
-        }
-
-        self.stack = stack_next;
+        self.stack
+            .retain(|(x, y)| match self.grid.get(*x, *y).unwrap().entropy() {
+                1 => {
+                    self.collapse_stack.push((*x, *y, true));
+                    false
+                }
+                _ => true,
+            });
 
         // sort the stack; entropy ascending
         self.sort();
@@ -101,7 +100,10 @@ where
             if self.grid.get(x, y).unwrap().entropy() == 0 {
                 self.rollback();
             } else {
-                self.grid.get_mut(x, y).unwrap().collapse(self.ticks, &mut self.rng);
+                self.grid
+                    .get_mut(x, y)
+                    .unwrap()
+                    .collapse(self.ticks, &mut self.rng);
                 self.collapse_stack.push((x, y, false));
             }
         }
@@ -112,7 +114,7 @@ where
 
         base_state.last_tick = self.ticks;
 
-        base_state        
+        base_state
     }
 
     pub fn rollback(&mut self) {
@@ -121,7 +123,6 @@ where
                 None => break,
                 Some(v) => v,
             };
-
 
             self.grid.set(lx, ly, self.new_base(lx, ly)).unwrap();
 
