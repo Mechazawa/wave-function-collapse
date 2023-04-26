@@ -280,16 +280,6 @@ fn main() {
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
 
-        #[cfg(not(feature = "sdl2"))]
-        wfc.tick();
-        
-        #[cfg(feature = "sdl2")]
-        if opt.slow {
-            wfc.tick_once();
-        } else {
-            wfc.tick();
-        }
-
         #[cfg(feature = "sdl2")]
         if let Some(draw) = sdl_draw.as_mut() {
             for event in draw.events.poll_iter() {
@@ -305,6 +295,16 @@ fn main() {
 
             update_canvas(&wfc, draw);
         }
+        
+        #[cfg(feature = "sdl2")]
+        if opt.slow {
+            wfc.tick_once();
+        } else {
+            wfc.tick();
+        }
+
+        #[cfg(not(feature = "sdl2"))]
+        wfc.tick();
     }
 
     progress.finish();

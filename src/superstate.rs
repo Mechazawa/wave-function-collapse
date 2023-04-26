@@ -1,11 +1,13 @@
 use crate::grid::Neighbors;
+use crate::wave::Set;
 use rand::seq::SliceRandom;
 use rand::RngCore;
+use std::hash::Hash;
 use std::rc::Rc;
 
 pub trait Collapsable: Clone {
-    type Identifier: Clone;
-    fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool;
+    type Identifier: Clone + Eq + Hash + Ord;
+    fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
     fn get_weight(&self) -> usize;
 }
@@ -61,7 +63,7 @@ where
         }
     }
 
-    pub fn tick(&mut self, neighbors: &Neighbors<Vec<T::Identifier>>) {
+    pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
         let entropy = self.entropy();
 
         if neighbors.len() > 0 && entropy > 1 {
