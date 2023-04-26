@@ -1458,6 +1458,7 @@ dependencies = [
  "num-traits",
  "rand 0.8.5",
  "rand_xorshift",
+ "rayon",
  "rusttype",
  "sdl2",
  "serde",

@@ -14,14 +14,12 @@ use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 
-use sdl2::mouse::Cursor;
 use sdl2::video::FullscreenType;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::time::Duration;
 use std::{io, usize};
 use structopt::clap::Shell;
@@ -86,7 +84,7 @@ struct SdlDraw {
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size, tiles: &Vec<Tile<Sprite>>, vsync: bool) -> Self {
+    pub fn new(size: Size, tiles: &[Tile<Sprite>], vsync: bool) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
@@ -211,6 +209,8 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
+    use std::sync::Arc;
+
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -251,7 +251,7 @@ fn main() {
         warn!("Retained {} tiles", tiles.len());
     }
 
-    let base_state = SuperState::new(tiles.iter().cloned().map(Rc::new).collect());
+    let base_state = SuperState::new(tiles.iter().cloned().map(Arc::new).collect());
     let grid = Grid::new(
         opt.output_size.width,
         opt.output_size.height,

@@ -45,7 +45,7 @@ pub struct TileConfig {
 
 #[cfg(feature = "image")]
 impl Tile<Sprite> {
-    pub fn from_config(configs: &Vec<TileConfig>) -> Vec<Self> {
+    pub fn from_config(configs: &[TileConfig]) -> Vec<Self> {
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
 
@@ -167,7 +167,7 @@ impl<T> Tile<T> {
     }
 }
 
-impl<T: Clone> Collapsable for Tile<T> {
+impl<T: Clone + Sync + Send> Collapsable for Tile<T> {
     type Identifier = u64;
 
     fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool {

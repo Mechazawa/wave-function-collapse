@@ -2,11 +2,13 @@ use crate::grid::Neighbors;
 use crate::wave::Set;
 use rand::seq::SliceRandom;
 use rand::RngCore;
-use std::hash::Hash;
-use std::rc::Rc;
+use std::{hash::Hash, sync::Arc};
 
-pub trait Collapsable: Clone {
-    type Identifier: Clone + Eq + Hash + Ord;
+#[cfg(feature = "threaded")]
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator, IndexedParallelIterator};
+
+pub trait Collapsable: Clone + Sync + Send {
+    type Identifier: Clone + Eq + Hash + Ord + Sync;
     fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
     fn get_weight(&self) -> usize;
@@ -17,7 +19,7 @@ pub struct SuperState<T>
 where
     T: Collapsable,
 {
-    pub possible: Vec<Rc<T>>,
+    pub possible: Vec<Arc<T>>,
     base_entropy: usize,
     entropy: usize,
 }
@@ -26,13 +28,13 @@ impl<T> SuperState<T>
 where
     T: Collapsable,
 {
-    pub fn new(possible: Vec<Rc<T>>) -> Self {
+    pub fn new(possible: Vec<Arc<T>>) -> Self {
         let base_entropy = possible.len();
 
         Self {
             possible,
             base_entropy,
-            entropy: base_entropy
+            entropy: base_entropy,
         }
     }
 
@@ -54,7 +56,7 @@ where
         self.entropy = self.possible.len();
     }
 
-    pub fn collapsed(&self) -> Option<Rc<T>> {
+    pub fn collapsed(&self) -> Option<Arc<T>> {
         match self.possible.len() {
             1 => Some(self.possible.get(0)?.clone()),
             _ => None,
@@ -77,14 +79,28 @@ where
         if neighbors.len() > 0 && self.entropy() > 1 {
             // self.possible.retain(|v| v.test(neighbors));
 
-            // This is faster than retaining
-            let mut i = 0;
-            while i < self.possible.len() {
-                if !self.possible[i].test(neighbors) {
-                    self.possible.remove(i);
-                } else {
-                    i += 1;
+            #[cfg(not(feature = "threaded"))]
+            {
+                //This is faster than retaining
+                let mut i = 0;
+                while i < self.possible.len() {
+                    if !self.possible[i].test(neighbors) {
+                        self.possible.remove(i);
+                    } else {
+                        i += 1;
+                    }
                 }
+            }
+            
+            #[cfg(feature = "threaded")]
+            {
+                self.possible = self
+                    .possible
+                    .par_iter()
+                    .with_min_len(20)
+                    .filter(|s| s.test(neighbors))
+                    .cloned()
+                    .collect();
             }
 
             self.update_entropy();
