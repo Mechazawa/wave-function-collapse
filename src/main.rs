@@ -90,7 +90,7 @@ impl SdlDraw {
         let video = context.video().unwrap();
 
         let window = video
-            .window("SDL2 Demo", size.width as u32, size.height as u32)
+            .window("Wave Function Collapse", size.width as u32, size.height as u32)
             .position_centered()
             .build()
             .map_err(|e| e.to_string())
