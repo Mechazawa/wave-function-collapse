@@ -8,12 +8,16 @@ use image::DynamicImage;
 use image::GenericImageView;
 use image::ImageBuffer;
 use log::debug;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::hash::Hash;
+use image::io::Reader as ImageReader;
+use enum_map::enum_map;
+
 
 #[derive(Debug, Clone)]
 pub struct Tile {
@@ -24,14 +28,14 @@ pub struct Tile {
     id: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct TileConfig {
-    image: DynamicImage,
-    slots: Neighbors<String>,
+    image: PathBuf,
+    slots: Vec<String>,
 }
 
 impl Tile {
-    pub fn from_config(configs: Vec<TileConfig>) -> Vec<Self> {
+    pub fn from_config(configs: &Vec<TileConfig>) -> Vec<Self> {
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
 
@@ -39,24 +43,27 @@ impl Tile {
         slots.reserve_exact(configs.len());
 
         for config in configs {
-            let tile = Self::new(config.image);
-            slots.push((tile.get_id(), config.slots));
+            let neighbors = enum_map!{
+                Direction::Up => config.slots[0].clone(),
+                Direction::Right => config.slots[1].clone(),
+                Direction::Down => config.slots[2].clone(),
+                Direction::Left => config.slots[3].clone(),
+            };
+
+            let image = ImageReader::open(config.image.as_path()).unwrap().decode().unwrap();
+            let tile = Self::new(image);
+
+            slots.push((tile.get_id(), neighbors));
             output.push(tile);
         }
 
         for index in 0..slots.len()  {
-            for (id, neighbors) in slots {
+            for (id, neighbors) in &slots {
                 for (direction, key) in neighbors {
-                    let inv_dir = match direction {
-                        Direction::Up => Direction::Down,
-                        Direction::Down => Direction::Up,
-                        Direction::Left => Direction::Right,
-                        Direction::Right => Direction::Left,
-                    };
-                    let rev_key: String = slots[index].1[inv_dir].chars().rev().collect();
+                    let rev_key: String = slots[index].1[direction.invert()].chars().rev().collect();
 
-                    if key == rev_key {
-                        output[index].neighbors[direction].push(id);
+                    if key == &rev_key {
+                        output[index].neighbors[direction].push(*id);
                     }
                 }
             }

@@ -4,9 +4,8 @@ mod superstate;
 mod tile;
 mod wfc;
 
-use image::GenericImageView;
 use image::Rgba;
-use image::{io::Reader as ImageReader, DynamicImage};
+use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
 use image::{ImageError, RgbaImage};
 use imageproc::drawing::draw_text_mut;
 use indicatif::ProgressBar;
@@ -17,7 +16,10 @@ use rand::rngs::OsRng;
 use rand::Rng;
 use rusttype::{Font, Scale};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use tile::TileConfig;
 use std::fmt::Debug;
+use std::fs::File;
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
@@ -38,6 +40,32 @@ fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     Ok(image)
 }
 
+fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
+    let path = PathBuf::from(s);
+    let file = File::open(path).map_err(|e| format!("Failed to open config file: {}", e))?;
+    let reader = BufReader::new(file);
+    let configs = serde_json::from_reader(reader).map_err(|e| format!("Failed to parse config file: {}", e))?;
+
+    Ok(configs)
+}
+
+fn load_input(s: &str) -> Result<Input, &'static str> {
+    if let Ok(image) = load_image(s) {
+        Ok(Input::Image(image))
+    } else if let Ok(configs) = load_config(s) {
+        Ok(Input::Config(configs))
+    } else {
+        Err("Failed to load input")
+    }
+}
+
+
+#[derive(Debug)]
+enum Input {
+    Image(DynamicImage),
+    Config(Vec<TileConfig>),
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Wave Function Collapse",
@@ -47,20 +75,20 @@ struct Opt {
     #[structopt(flatten)]
     verbose: QuietVerbose,
 
-    #[structopt(parse(try_from_str=load_image), help = "Input image")]
-    input: DynamicImage,
-
-    #[structopt(parse(from_os_str), help = "Output image")]
-    output: PathBuf,
+    #[structopt(parse(try_from_str=load_input), help = "Input")]
+    input: Input,
 
     #[structopt(
         parse(try_from_str),
         short,
         long,
-        default_value = "10x10",
+        required_if("input-type", "config"),
         help = "Input image grid size"
     )]
-    input_size: Size,
+    input_size: Option<Size>,
+
+    #[structopt(parse(from_os_str), help = "Output image")]
+    output: PathBuf,
 
     #[structopt(
         parse(try_from_str),
@@ -86,7 +114,10 @@ fn main() {
     )
     .unwrap();
 
-    let mut tiles = Tile::from_image(&opt.input, &opt.input_size);
+    let mut tiles = match &opt.input {
+        Input::Image(value) => Tile::from_image(value, &opt.input_size.unwrap()),
+        Input::Config(value) => Tile::from_config(value),
+    };
 
     info!("{} unique tiles found", tiles.len());
 
@@ -138,11 +169,9 @@ fn main() {
     }
 
     // drawing
-    let (image_width, image_height) = opt.input.dimensions();
+    let (tile_width, tile_height) = tiles[0].sprite.image.dimensions();
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
-    let tile_width = image_width / opt.input_size.width as u32;
-    let tile_height = image_height / opt.input_size.height as u32;
 
     let mut canvas = RgbaImage::new(
         opt.output_size.width as u32 * tile_width,

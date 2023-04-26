@@ -4,9 +4,20 @@ use enum_map::{Enum, EnumMap, enum_map};
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]
 pub enum Direction {
     Up,
+    Right,
     Down,
     Left,
-    Right,
+}
+
+impl Direction {
+    pub fn invert(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+        }
+    }
 }
 
 pub type Neighbors<T> = EnumMap<Direction, T>;
