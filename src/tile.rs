@@ -41,7 +41,7 @@ pub struct TileConfig {
 }
 
 #[cfg(feature = "image")]
-impl Tile<image_imports::Sprite> {
+impl Tile<Sprite> {
     pub fn from_config(configs: &Vec<TileConfig>) -> Vec<Self> {
 
         let mut output = Vec::new();
