@@ -188,12 +188,12 @@ struct Opt {
     #[structopt(short = "V", long, help = "Open a window to show the generation")]
     visual: bool,
 
-    #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
-    completions: Option<Shell>,
-
     #[cfg(feature = "sdl2")]
     #[structopt(long, help = "Render every step during visualisation")]
     slow: bool,
+
+    #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
+    completions: Option<Shell>,
 }
 
 #[cfg(feature = "image")]
