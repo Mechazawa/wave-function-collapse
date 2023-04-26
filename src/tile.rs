@@ -151,7 +151,7 @@ impl<T> Tile<T> {
     }
 }
 
-impl<T> Collapsable for Tile<T> {
+impl<T: Clone> Collapsable for Tile<T> {
     type Identifier = u64;
 
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool {

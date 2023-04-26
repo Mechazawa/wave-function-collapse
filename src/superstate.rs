@@ -3,8 +3,8 @@ use rand::seq::SliceRandom;
 use rand::RngCore;
 use std::rc::Rc;
 
-pub trait Collapsable {
-    type Identifier;
+pub trait Collapsable: Clone {
+    type Identifier: Clone;
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
 }
