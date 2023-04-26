@@ -4,7 +4,6 @@ mod superstate;
 mod tile;
 mod wave;
 
-
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
 use image::{ImageError, RgbaImage};
 
@@ -18,11 +17,11 @@ use rand::Rng;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::fmt::Debug;
 use std::fs::File;
-use std::io;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
+use std::{io, usize};
 use structopt::clap::Shell;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
@@ -37,16 +36,16 @@ use wave::Wave;
 
 #[cfg(feature = "sdl2")]
 use {
-    superstate::Collapsable,
-    sprite::Sprite,
-    std::collections::HashMap,
-    sdl2::pixels::{PixelFormatEnum, Color},
+    sdl2::event::Event,
+    sdl2::keyboard::Keycode,
+    sdl2::pixels::{Color, PixelFormatEnum},
     sdl2::rect::Rect,
     sdl2::render::{Canvas, Texture},
     sdl2::video::Window,
     sdl2::EventPump,
-    sdl2::event::Event,
-    sdl2::keyboard::Keycode,
+    sprite::Sprite,
+    std::collections::HashMap,
+    superstate::Collapsable,
 };
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
@@ -81,11 +80,12 @@ struct SdlDraw {
     canvas: Canvas<Window>,
     events: EventPump,
     pub textures: HashMap<u64, Texture>,
+    prev_entropy: Grid<usize>,
 }
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size, tiles: &Vec<Tile<Sprite>>) -> Self {
+    pub fn new(size: Size, grid_size: Size, tiles: &Vec<Tile<Sprite>>, vsync: bool) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
@@ -96,13 +96,13 @@ impl SdlDraw {
             .map_err(|e| e.to_string())
             .unwrap();
 
-        let canvas = window
-            .into_canvas()
-            .target_texture()
-            .present_vsync()
-            .build()
-            .map_err(|e| e.to_string())
-            .unwrap();
+        let mut builder = window.into_canvas().target_texture();
+
+        if vsync {
+            builder = builder.present_vsync();
+        }
+
+        let canvas = builder.build().map_err(|e| e.to_string()).unwrap();
 
         let events = context.event_pump().unwrap();
         let texture_creator = canvas.texture_creator();
@@ -134,6 +134,7 @@ impl SdlDraw {
             canvas,
             events,
             textures,
+            prev_entropy: Grid::new(grid_size.width, grid_size.height, &mut |_, _| 0),
         }
     }
 }
@@ -191,6 +192,10 @@ struct Opt {
     #[cfg(feature = "sdl2")]
     #[structopt(long, help = "Render every step during visualisation")]
     slow: bool,
+
+    #[cfg(feature = "sdl2")]
+    #[structopt(long, help = "Turns on vsync")]
+    vsync: bool,
 
     #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
@@ -266,13 +271,18 @@ fn main() {
     #[cfg(feature = "sdl2")]
     let mut sdl_draw = if opt.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
-        let mut size = opt.output_size;
+        let mut size = opt.output_size.clone();
 
         assert_eq!(tile_width, tile_height);
 
         size.scale(tile_width.try_into().unwrap());
 
-        Some(SdlDraw::new(size, &tiles))
+        Some(SdlDraw::new(
+            size,
+            opt.output_size.clone(),
+            &tiles,
+            opt.vsync,
+        ))
     } else {
         None
     };
@@ -295,7 +305,7 @@ fn main() {
 
             update_canvas(&wfc, draw);
         }
-        
+
         #[cfg(feature = "sdl2")]
         if opt.slow {
             wfc.tick_once();
@@ -343,12 +353,22 @@ fn main() {
 // todo only draw updated
 #[cfg(feature = "sdl2")]
 fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
-
-    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
+    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
+        .value
+        .image
+        .dimensions();
 
     // context.canvas.clear();
 
     for (x, y, cell) in &wfc.grid {
+        let prev_entropy = *context.prev_entropy.get(x, y).unwrap();
+
+        context.prev_entropy.set(x, y, cell.entropy()).unwrap();
+
+        if cell.entropy() == prev_entropy {
+            continue;
+        }
+
         if let Some(tile) = cell.collapsed() {
             // todo streamline
             let texture = context.textures.get(&tile.get_id()).unwrap();
@@ -368,14 +388,14 @@ fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
             } else {
                 Color::RED
             };
-            
+
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
                 tile_width,
                 tile_height,
             );
-        
+
             context.canvas.set_draw_color(color);
             context.canvas.fill_rect(rect).unwrap();
         }
