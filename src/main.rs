@@ -5,7 +5,8 @@ use image::Rgba;
 use image::{io::Reader as ImageReader, DynamicImage};
 use image::{ImageError, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use log::{debug, info, trace};
+use log::warn;
+use log::{info, trace};
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use rusttype::{Font, Scale};
@@ -17,7 +18,6 @@ use std::rc::Rc;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
-use lib::Collapsable;
 use lib::Direction;
 use lib::Size;
 use lib::SuperState;
@@ -75,13 +75,23 @@ fn main() {
     )
     .unwrap();
 
-    let tiles = Tile::get_tile_set(&opt.input, &opt.input_size);
+    let mut tiles = Tile::get_tile_set(&opt.input, &opt.input_size);
 
     info!("{} unique tiles found", tiles.len());
 
     let base_state = SuperState {
         possible: tiles.clone(),
     };
+
+    let invalid_neighbors = tiles.iter().map(|t| t.neighbors.keys().len()).filter(|c| *c != 4).collect::<Vec<usize>>();
+    
+    if invalid_neighbors.len() > 0 {
+        warn!("Found {} tiles with invalid amount of neighbors: {:?}", invalid_neighbors.len(), invalid_neighbors);
+
+        tiles.retain(|t| t.neighbors.len() == 4);
+
+        warn!("Retained {} tiles", tiles.len());
+    }
 
     let mut grid = vec![base_state.clone(); opt.output_size.area() as usize];
 
@@ -92,7 +102,6 @@ fn main() {
     let tile_height = image_height / opt.input_size.height;
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
-
 
     // todo: it always starts in left-bottom??
     grid.shuffle(&mut rng);
