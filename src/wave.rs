@@ -1,13 +1,16 @@
 use std::collections::{HashSet, VecDeque};
+use std::default;
 use std::hash::{Hasher, BuildHasher};
 
 use log::trace;
 use rand::seq::IteratorRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
+use range_set_blaze::{RangeSetBlaze, Integer};
 
 use crate::grid::{Direction, Grid, Neighbors, Position};
 use crate::superstate::{Collapsable, SuperState};
+
 
 /// https://github.com/chris-morgan/anymap/blob/2e9a5704/src/lib.rs#L599
 #[derive(Debug, Clone, Copy, Default)]
@@ -36,8 +39,8 @@ impl BuildHasher for NoOpHasher {
 }
 
 type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
-pub type Set<T> = HashSet<T, NoOpHasher>;
-
+// pub type Set<T> = HashSet<T, NoOpHasher>;
+pub type Set<T> = RangeSetBlaze<T>;
 
 #[derive(Debug, PartialEq, Eq)]
 enum CollapseReason {
@@ -117,7 +120,7 @@ where
 
         if self.data.get(x, y).unwrap().is_none() {
             let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
-                None => Set::default(),
+                None => Set::new(),
                 Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
             });
 
@@ -295,7 +298,7 @@ where
                 let mut base = self.grid_base.get(nx, ny).unwrap().clone();
 
                 let neighbors = self.grid.get_neighbors(nx, ny).map(|_, v| match v {
-                    None => Set::default(),
+                    None => Set::new(),
                     Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
                 });
 

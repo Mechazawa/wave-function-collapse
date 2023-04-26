@@ -2,11 +2,12 @@ use crate::grid::Neighbors;
 use crate::wave::Set;
 use rand::seq::SliceRandom;
 use rand::RngCore;
+use range_set_blaze::Integer;
 use std::hash::Hash;
 use std::rc::Rc;
 
 pub trait Collapsable: Clone {
-    type Identifier: Clone + Eq + Hash + Ord;
+    type Identifier: Integer + Default;
     fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
     fn get_weight(&self) -> usize;
