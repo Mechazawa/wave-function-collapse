@@ -52,6 +52,13 @@ impl Size {
         self.width *= factor;
         self.height *= factor;
     }
+
+    pub fn uniform(size: usize) -> Self {
+        Self { 
+            width: size,
+            height: size,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
