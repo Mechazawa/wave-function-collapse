@@ -51,22 +51,40 @@ where
         self.grid.size() - self.collapsed.len()
     }
 
-    pub fn tick(&mut self) -> bool {
-        if self.stack.is_empty() {
-            let success = self.collapse_edge();
+    pub fn maybe_collapse(&mut self) -> Option<Position> {
+        let pos = self.collapse_edge();
 
-            if !success {
-                trace!("Failed to find edge to collapse");
-                
-                return self.collapse_any();
-            }
+        if pos.is_none() {
+            trace!("Failed to find edge to collapse");
+            
+            return self.collapse_any();
+        } else {
+            return pos;
         }
+    }
+
+    pub fn tick(&mut self) -> bool {
+        if self.stack.is_empty() && self.maybe_collapse().is_none() {
+            return false;
+        } 
 
         while let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);
         }
 
         true
+    }
+
+    pub fn tick_once(&mut self) -> Option<Position> {
+        if let Some((x, y)) = self.stack.pop_front() {
+            self.tick_cell(x, y);
+
+            Some((x, y))
+        } else if let Some(value) = self.maybe_collapse() {
+            return Some(value);
+         } else {
+            None
+        }
     }
 
     fn tick_cell(&mut self, x: usize, y: usize) {
@@ -100,7 +118,7 @@ where
         self.mark(x, y);
     }
 
-    pub fn collapse_any(&mut self) -> bool {
+    pub fn collapse_any(&mut self) ->  Option<Position> {
         let maybe = self
             .grid
             .iter()
@@ -111,13 +129,13 @@ where
         match maybe {
             Some((x, y)) => {
                 self.collapse(x, y);
-                true
+                Some((x, y))
             }
-            None => false,
+            None => None,
         }
     }
 
-    pub fn collapse_edge(&mut self) -> bool {
+    pub fn collapse_edge(&mut self) -> Option<Position> {
         // get lowest entropy
         let positions: Vec<_> = self
             .grid
@@ -133,7 +151,7 @@ where
             .unwrap_or(&0);
 
         if *lowest == 0 {
-            return false;
+            return None;
         }
 
         // filter for edge
@@ -151,13 +169,13 @@ where
             .collect();
 
         if choices.len() == 0 {
-            false
+            None
         } else {
             let &(x, y) = choices.choose(&mut self.rng).unwrap();
 
             self.collapse(x, y);
 
-            true
+            Some((x, y))
         }
     }
 
