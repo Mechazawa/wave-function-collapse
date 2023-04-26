@@ -241,6 +241,7 @@ fn main() {
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
         wfc.tick();
+        // wfc.tick_once();
 
         if let Some(draw) = sdl_draw.as_mut() {
             for event in draw.events.poll_iter() {
