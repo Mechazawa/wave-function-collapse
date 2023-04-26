@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 use std::hash::{Hasher, BuildHasher};
 
 use log::trace;
-use rand::seq::{IteratorRandom, SliceRandom};
+use rand::seq::IteratorRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
