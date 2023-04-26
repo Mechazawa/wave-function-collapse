@@ -3,8 +3,6 @@ use image::GenericImageView;
 use image::ImageBuffer;
 use image::Pixel;
 use log::debug;
-use log::trace;
-use log::warn;
 use num_traits::cast::ToPrimitive;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
@@ -59,11 +57,20 @@ pub enum Direction {
     Left,
     Right,
 }
+
+#[derive(Debug, Clone)]
+pub struct Sprite {
+    /// Todo either figure out other purposes or phase out struct
+    pub image: DynamicImage,
+}
+
 #[derive(Debug, Clone)]
 pub struct Tile {
-    pub image: Rc<DynamicImage>,
+    pub sprite: Rc<Sprite>,
     /// todo: neighbours per side
-    neighbors: HashMap<Direction, HashSet<Rc<Self>>>,
+    neighbors: HashMap<Direction, HashMap<u64, Rc<Self>>>,
+
+    id: u64,
 }
 
 impl Tile {
@@ -72,8 +79,8 @@ impl Tile {
         let tile_width = image_width / grid_size.width;
         let tile_height = image_height / grid_size.height;
 
-        let mut unique: HashSet<Rc<Self>> = HashSet::new();
-        let mut grid: Vec<Rc<Self>> = Vec::new();
+        let mut unique: HashMap<u64, Rc<Self>> = Default::default();
+        let mut grid: Vec<Rc<Self>> = Default::default();;
 
         debug!("Generating tiles");
 
@@ -84,14 +91,11 @@ impl Tile {
                 let buffer =
                     ImageBuffer::from_fn(tile_width, tile_height, |x, y| view.get_pixel(x, y));
 
-                let new_tile = Rc::new(Tile {
-                    image: Rc::new(DynamicImage::from(buffer)),
-                    neighbors: HashMap::new(),
-                });
+                let new_tile = Rc::new(Tile::new(DynamicImage::from(buffer)));
 
-                unique.insert(new_tile.clone());
+                unique.insert(new_tile.get_id(), new_tile.clone());
 
-                let tile = unique.get(&new_tile).unwrap();
+                let tile = unique.get(&new_tile.get_id()).unwrap();
 
                 grid.push(tile.clone());
             }
@@ -110,18 +114,18 @@ impl Tile {
 
                     tile.neighbors
                         .entry(direction)
-                        .or_insert_with(HashSet::new)
-                        .insert(Rc::clone(&value));
+                        .or_insert_with(HashMap::new)
+                        .insert(value.get_id(), Rc::clone(&value));
                 }
             }
 
             assert!(tile_ref.neighbors.len() > 0);
 
             // todo: ?????
-            unique.replace(tile_ref);
+            unique.insert(tile_ref.get_id(), tile_ref);
         }
 
-        let output = unique.into_iter().collect::<Vec<Rc<Self>>>();
+        let output = unique.values().cloned().collect::<Vec<Rc<Self>>>();
 
         for tile in output.iter() {
             assert!(tile.neighbors.len() > 0);
@@ -133,30 +137,38 @@ impl Tile {
     }
 }
 
-impl Hash for Tile {
+impl Hash for Sprite {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for pixel in self.image.pixels() {
             for channel in pixel.2.channels() {
-                if let Some(value) = channel.to_i32() {
-                    state.write_i32(value)
+                if let Some(value) = channel.to_u8() {
+                    state.write_u8(value)
                 }
             }
         }
     }
 }
 
-impl PartialEq for Tile {
-    fn eq(&self, other: &Self) -> bool {
-        let mut s1 = DefaultHasher::new();
-        let mut s2 = DefaultHasher::new();
+impl Tile {
+    pub fn new(image: DynamicImage) -> Self {
+        let mut hasher = DefaultHasher::new();
+        let sprite = Sprite { image };
 
-        self.hash(&mut s1);
-        other.hash(&mut s2);
+        sprite.hash(&mut hasher);
 
-        s1.finish() == s2.finish()
+        Self {
+            id: hasher.finish(),
+            sprite: Rc::new(sprite),
+            neighbors: Default::default(),
+        }
+    }
+
+    /// Prevent us from calculating the hash all the
+    ///   time and make it easier to pass around
+    pub fn get_id(&self) -> u64 {
+        self.id
     }
 }
-impl Eq for Tile {}
 
 pub trait Collapsable {
     fn test(&self, neighbors: &HashMap<Direction, Vec<Rc<Self>>>) -> bool;
@@ -165,7 +177,7 @@ pub trait Collapsable {
 impl Collapsable for Tile {
     fn test(&self, neighbors: &HashMap<Direction, Vec<Rc<Self>>>) -> bool {
         let mut valid = 0;
-            
+
         assert!(self.neighbors.len() > 0);
 
         for (direction, tiles) in neighbors {
@@ -174,11 +186,11 @@ impl Collapsable for Tile {
                 None => {
                     valid += 1; // todo hack, this is wrong
                     continue;
-                },
+                }
             };
 
             for tile in tiles {
-                if possible.contains(tile) {
+                if possible.contains_key(&tile.get_id()) {
                     valid += 1;
                     break;
                 }

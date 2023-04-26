@@ -1,18 +1,21 @@
 mod lib;
 
-use image::{ImageError, RgbaImage};
+use image::GenericImageView;
+use image::Rgba;
 use image::{io::Reader as ImageReader, DynamicImage};
+use image::{ImageError, RgbaImage};
+use imageproc::drawing::draw_text_mut;
 use log::{debug, info, trace};
+use rand::prelude::SliceRandom;
 use rand::thread_rng;
+use rusttype::{Font, Scale};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::rc::Rc;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
-use image::GenericImageView;
-use rand::prelude::SliceRandom;
 
 use lib::Collapsable;
 use lib::Direction;
@@ -87,14 +90,13 @@ fn main() {
     let (image_width, image_height) = opt.input.dimensions();
     let tile_width = image_width / opt.input_size.width;
     let tile_height = image_height / opt.input_size.height;
-    let mut canvas = RgbaImage::new(
-        opt.output_size.width * tile_width, 
-        opt.output_size.height * tile_height,
-    );
+    let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
+    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
-    stack.shuffle(&mut rng);
 
-    // grid[stack.pop().unwrap()].collapse(&mut rng);
+    // todo: it always starts in left-bottom??
+    grid.shuffle(&mut rng);
+    grid[stack.pop().unwrap()].collapse(&mut rng);
 
     while stack.len() > 0 {
         info!("stack {}", stack.len());
@@ -106,7 +108,7 @@ fn main() {
 
             for (direction, offset) in opt.output_size.get_offsets() {
                 let target = (*index) as i32 + offset;
-                
+
                 if let Some(cell) = grid.get(target as usize) {
                     neighbors.insert(direction, cell.possible.clone());
                 }
@@ -120,21 +122,46 @@ fn main() {
         stack.sort_by(|a, b| grid[*b].entropy().cmp(&grid[*a].entropy()));
 
         // collapse lowest entropy
+        stack.retain(|v| grid[*v].entropy() > 1);
         grid[stack.pop().unwrap()].collapse(&mut rng);
 
-        // remove the collapsed states
-        stack.retain(|v| grid[*v].entropy() > 1);
+        stack.reverse();
 
         // draw
         // todo only draw recently collapsed
         // todo broken :(
+        let mut canvas = RgbaImage::new(
+            opt.output_size.width * tile_width,
+            opt.output_size.height * tile_height,
+        );
+
         for index in 0..grid.len() {
             let x = (index as u32) % opt.output_size.width;
             let y = (index as u32) / opt.output_size.width;
 
+            trace!("draw {}, {}", x, y);
+
             if let Some(t) = grid[index].collapsed() {
-                trace!("draw {}, {}", x, y);
-                image::imageops::overlay(&mut canvas, t.image.as_ref(), (x * tile_width) as i64, (y * tile_height) as i64);
+                image::imageops::overlay(
+                    &mut canvas,
+                    &t.sprite.image,
+                    (x * tile_width) as i64,
+                    (y * tile_height) as i64,
+                );
+            } else {
+                let scale = Scale::uniform(6.0);
+                let color = Rgba([255, 0, 0, 255]); // red
+                let text = format!("{}", grid[index].entropy());
+
+                draw_text_mut(
+                    &mut canvas,
+                    color,
+                    (x * tile_width) as i32,
+                    (y * tile_height) as i32,
+                    scale,
+                    &font,
+                    &text,
+                );
             }
         }
 
