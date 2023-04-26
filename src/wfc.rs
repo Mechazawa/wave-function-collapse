@@ -1,6 +1,6 @@
 use log::{debug, trace, warn};
-use rand::{RngCore, SeedableRng};
 use rand::prelude::SliceRandom;
+use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use crate::grid::{Grid, Neighbors};
@@ -25,8 +25,7 @@ where
     old_collapse_stack_len: usize,
 }
 
-pub struct Updated
-{
+pub struct Updated {
     x: usize,
     y: usize,
     collapsed: bool,
@@ -41,10 +40,11 @@ where
 
         let mut stack: Vec<Position> = grid.iter().map(|(x, y, _)| (x, y)).collect();
         let collapse_stack = Vec::with_capacity(stack.len());
-        
-        stack.shuffle(&mut rng);
-        
+
+        stack.reverse();
+
         let (x, y) = stack.pop().unwrap();
+        stack.shuffle(&mut rng);
         grid.get_mut(x, y).unwrap().collapse(0, &mut rng);
 
         debug!("Starting at ({}, {})", x, y);
@@ -115,8 +115,18 @@ where
         // sort the stack; entropy ascending
         self.fixup();
 
+        let index = self.pick_next();
+
+        if index.is_none() {
+            assert_eq!(self.stack.len(), 0);
+            trace!("Nothing to collapse");
+            return;
+        }
+
+        // todo pick index on edge (so with neighborsl)
         // Either rollback if lowest entropy is zero or collapse it.
-        if let Some(&(x, y)) = self.stack.first() {
+        if let Some(&(x, y)) = self.stack.get(index.unwrap()) {
+            // todo: we need to remove the used stack item!
             self.tick_cell(x, y, true);
 
             if self.grid.get(x, y).unwrap().entropy() == 0 {
@@ -134,6 +144,56 @@ where
                 }
             }
         }
+    }
+
+    // Assumes a sorted stack
+    fn stack_floor_size(&self) -> usize {
+        let stack_size = self.stack.len();
+
+        if stack_size == 0 {
+            return 0;
+        }
+
+        let (x, y) = self.stack[0];
+        let value = self.grid.get(x, y).unwrap().entropy();
+
+        for index in 0..(stack_size - 1) {
+            let (x, y) = self.stack[index];
+
+            if self.grid.get(x, y).unwrap().entropy() != value {
+                return index;
+            }
+        }
+
+        stack_size
+    }
+
+    fn pick_next(&mut self) -> Option<usize> {
+        let floor = self.stack_floor_size();
+
+        if floor == 0 {
+           return None;
+        }
+
+        let mut options: Vec<usize> = (0..floor).collect();
+
+        options.shuffle(&mut self.rng);
+
+        let fallback = options[0];
+
+        for index in options {
+            let (x, y) = self.stack[index];
+
+            for (_, maybe) in self.grid.get_neighbors(x, y) {
+                if let Some(neighbor) = maybe {
+                    if neighbor.entropy() == 1 {
+                        return Some(index);
+                    }
+                }
+            }
+        }
+
+        Some(fallback)
     }
 
     pub fn new_base(&self, x: usize, y: usize) -> SuperState<T> {
@@ -165,17 +225,23 @@ where
     }
 
     pub fn rollback(&mut self) {
-        self.rollbacks += 5;
+        self.rollbacks += 1;
 
-        let mut steps = 3 + (self.rollbacks / 100);
+        let mut steps = 1 + (self.rollbacks / 5);
 
         if steps > 1 {
-            trace!("Rollback score: {}, steps: {}, stack sizes: ({}, {})", self.rollbacks, steps, self.stack.len(), self.collapse_stack.len());
+            trace!(
+                "Rollback score: {}, steps: {}, stack sizes: ({}, {})",
+                self.rollbacks,
+                steps,
+                self.stack.len(),
+                self.collapse_stack.len()
+            );
         }
 
         if steps > 10 {
             warn!("Lockup detected, resetting...");
-            
+
             self.reset();
 
             return;
@@ -210,15 +276,14 @@ where
     }
 
     fn fixup(&mut self) {
-        let get_index = |x,y|x + (y * self.grid.width());
+        let get_index = |x, y| x + (y * self.grid.width());
 
-        self.stack.sort_by(|a, b| {
-            get_index(a.0, a.1).cmp(&get_index(b.0, b.1))
-        });
+        self.stack
+            .sort_by(|a, b| get_index(a.0, a.1).cmp(&get_index(b.0, b.1)));
 
         self.stack.dedup();
 
-        self.stack.sort_by(|a, b| {
+        self.stack.sort_unstable_by(|a, b| {
             self.grid
                 .get(a.0, a.1)
                 .unwrap()
@@ -247,7 +312,7 @@ where
         for i in stack_len..(stack_len - stack_diff) {
             let item = self.stack[i];
 
-            output.push(Updated{
+            output.push(Updated {
                 x: item.0,
                 y: item.1,
                 collapsed: false,
@@ -257,7 +322,7 @@ where
         for i in collapse_len..(collapse_len - collapse_diff) {
             let item = self.collapse_stack[i];
 
-            output.push(Updated{
+            output.push(Updated {
                 x: item.0,
                 y: item.1,
                 collapsed: true,
