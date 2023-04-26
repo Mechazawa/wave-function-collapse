@@ -197,6 +197,10 @@ struct Opt {
     #[structopt(long, help = "Turns on vsync")]
     vsync: bool,
 
+    #[cfg(feature = "sdl2")]
+    #[structopt(long, help = "Hold the image for n seconds after finishing")]
+    hold: Option<f32>,
+
     #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
 }
@@ -318,6 +322,13 @@ fn main() {
     }
 
     progress.finish();
+
+    #[cfg(feature = "sdl2")]
+    if let Some(delay) = opt.hold {
+        info!("Waiting for {} seconds", delay);
+        
+        std::thread::sleep(Duration::from_secs_f32(delay));
+    }
 
     info!("Drawing output");
     if opt.output.is_none() {
