@@ -33,14 +33,14 @@ impl<T> Wave<T>
 where
     T: Collapsable,
 {
-    pub fn new(grid: Grid<SuperState<T>>) -> Self {
+    pub fn new(grid: Grid<SuperState<T>>, seed: u64) -> Self {
         Self {
             stack: VecDeque::with_capacity(grid.size()),
             collapsed: Vec::with_capacity(grid.size()),
             data: Grid::new(grid.width(), grid.height(), &mut |_, _| Default::default()),
             grid_base: grid.clone(),
             grid,
-            rng: Box::new(XorShiftRng::from_rng(thread_rng()).unwrap()),
+            rng: Box::new(XorShiftRng::seed_from_u64(seed)),
         }
     }
 
