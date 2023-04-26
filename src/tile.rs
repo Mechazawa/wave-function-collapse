@@ -49,14 +49,13 @@ impl Tile {
         for (x, y, tile_id) in &grid {
             let tile = unique.get_mut(&tile_id).unwrap();
 
-            for (direction, value) in grid.get_neighbors(x, y) {
-                tile.neighbors
-                    .get_or_default(direction)
-                    .unwrap()
-                    .insert(*value);
+            for (direction, maybe) in grid.get_neighbors(x, y) {
+                if let Some(value) = maybe {
+                    tile.neighbors[direction].insert(*value);
+                }
             }
 
-            assert!(tile.neighbors.count() > 0);
+            assert!(tile.neighbors.len() > 0);
 
             // todo: ?????
             // unique.insert(tile_ref.get_id(), tile_ref);
@@ -65,7 +64,7 @@ impl Tile {
         let output = unique.values().cloned().collect::<Vec<Self>>();
 
         for tile in output.iter() {
-            assert!(tile.neighbors.count() > 0);
+            assert!(tile.neighbors.len() > 0);
         }
 
         // todo: Keep track of rotation
@@ -91,15 +90,15 @@ impl Tile {
 
 impl Collapsable for Tile {
     fn test(&self, neighbors: &Neighbors<Vec<u64>>) -> bool {
-        for direction in neighbors.list() {
-            let tiles = neighbors.get(direction).unwrap();
-            let possible = self.neighbors.get(direction).expect("Missing neighbor");
+        for (direction, tiles) in neighbors {
+            let possible = &self.neighbors[direction];
 
             let mut found = false;
 
             for tile in tiles {
                 if possible.contains(tile) {
                     found = true;
+                    dbg!(found);
                 }
             }
 

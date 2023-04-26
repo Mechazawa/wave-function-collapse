@@ -1,7 +1,6 @@
-use crate::grid::{Direction, Neighbors};
+use crate::grid::Neighbors;
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub trait Collapsable {
@@ -43,7 +42,7 @@ where
     }
 
     pub fn tick(&mut self, neighbors: &Neighbors<Vec<u64>>) {
-        if neighbors.is_empty() == false && self.entropy() > 1 {
+        if neighbors.len() == 0 && self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
         }
     }
