@@ -263,7 +263,7 @@ fn main() {
     progress.set_style(
         ProgressStyle::default_bar()
             .template(
-                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {per_sec}",
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>5}/{len} {per_sec:>12}",
             )
             .unwrap()
             .progress_chars("#>-"),
