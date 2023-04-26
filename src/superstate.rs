@@ -7,6 +7,7 @@ pub trait Collapsable: Clone {
     type Identifier: Clone;
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
+    fn get_weight(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +56,7 @@ where
     pub fn collapse(&mut self, tick: u32, rng: &mut dyn RngCore) {
         if self.entropy() > 1 {
             self.last_tick = tick;
-            self.possible = vec![self.possible.choose(rng).unwrap().clone()];
+            self.possible = vec![self.possible.choose_weighted(rng, |v| v.get_weight()).unwrap().clone()];
         }
     }
 
