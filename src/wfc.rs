@@ -42,7 +42,7 @@ where
     }
 
     pub fn tick(&mut self, neighbors: &Neighbors<Vec<u64>>) {
-        if neighbors.len() == 0 && self.entropy() > 1 {
+        if neighbors.len() > 0 && self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
         }
     }

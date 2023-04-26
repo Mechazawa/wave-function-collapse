@@ -1,6 +1,4 @@
 use core::str::FromStr;
-
-
 use enum_map::{Enum, EnumMap, enum_map};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]
