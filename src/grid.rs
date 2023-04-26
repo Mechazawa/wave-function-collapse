@@ -34,18 +34,22 @@ impl FromStr for Size {
     }
 }
 
-pub struct Grid<T> {
+#[derive(Debug, Clone)]
+pub struct Grid<T>
+where T: Clone {
     data: Vec<T>,
     width: usize,
     height: usize,
 }
 
-pub struct GridIter<'a, T> {
+pub struct GridIter<'a, T>
+where T: Clone  {
     grid: &'a Grid<T>,
     pos: usize,
 }
 
-impl<T> Grid<T> {
+impl<T> Grid<T> 
+where T: Clone {
     pub fn new<F: FnMut(usize, usize) -> T>(width: usize, height: usize, initializer: &mut F) -> Self {
         let mut data = Vec::with_capacity(width * height);
 
@@ -139,7 +143,8 @@ impl<T> Grid<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a Grid<T> {
+impl<'a, T> IntoIterator for &'a Grid<T>
+where T: Clone  {
     type Item = (usize, usize, &'a T);
     type IntoIter = GridIter<'a, T>;
 
@@ -148,7 +153,8 @@ impl<'a, T> IntoIterator for &'a Grid<T> {
     }
 }
 
-impl<'a, T> Iterator for GridIter<'a, T> {
+impl<'a, T> Iterator for GridIter<'a, T> 
+where T: Clone {
     type Item = (usize, usize, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
