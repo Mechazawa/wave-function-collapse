@@ -2,7 +2,6 @@ mod grid;
 mod wfc;
 mod tile;
 mod sprite;
-mod enum_map;
 
 use image::GenericImageView;
 use image::Rgba;
@@ -33,6 +32,7 @@ use wfc::SuperState;
 use tile::Tile;
 
 use crate::grid::Grid;
+use crate::grid::Neighbors;
 use crate::wfc::Collapsable;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
@@ -96,7 +96,7 @@ fn main() {
 
     let invalid_neighbors = tiles
         .iter()
-        .map(|t| t.neighbors.keys().len())
+        .map(|t| t.neighbors.count())
         .filter(|c| *c != 4)
         .collect::<Vec<usize>>();
 
@@ -107,7 +107,7 @@ fn main() {
             invalid_neighbors
         );
 
-        tiles.retain(|t| t.neighbors.len() == 4);
+        tiles.retain(|t| t.neighbors.count() == 4);
 
         warn!("Retained {} tiles", tiles.len());
     }
@@ -167,11 +167,11 @@ fn main() {
         // todo: optimise to only test positions near collapsed
         // test all positions
         for &(x, y) in &stack {
-            let mut neighbors: HashMap<Direction, Vec<u64>> = HashMap::new();
+            let mut neighbors: Neighbors<Vec<u64>> = Default::default();
 
             for (direction, cell) in grid.get_neighbors(x, y) {
                 if cell.entropy() < base_state.entropy() {
-                    neighbors.insert(
+                    neighbors.set(
                         direction,
                         cell.possible.iter().map(|t| t.get_id()).collect(),
                     );
