@@ -94,7 +94,7 @@ fn main() {
 
     stack.shuffle(&mut rng);
 
-    grid[stack.pop().unwrap()].collapse(&mut rng);
+    // grid[stack.pop().unwrap()].collapse(&mut rng);
 
     while stack.len() > 0 {
         info!("stack {}", stack.len());
@@ -112,19 +112,25 @@ fn main() {
                 }
             }
 
-            trace!("{}", index);
+            // trace!("{}", index);
             grid[*index].tick(&neighbors);
         }
 
         // sort the stack; entropy ascending
         stack.sort_by(|a, b| grid[*b].entropy().cmp(&grid[*a].entropy()));
 
+        // collapse lowest entropy
+        grid[stack.pop().unwrap()].collapse(&mut rng);
+
+        // remove the collapsed states
+        stack.retain(|v| grid[*v].entropy() > 1);
+
         // draw
         // todo only draw recently collapsed
         // todo broken :(
         for index in 0..grid.len() {
-            let x = index as u32 % opt.input_size.width;
-            let y = index as u32 / opt.input_size.width;
+            let x = (index as u32) % opt.output_size.width;
+            let y = (index as u32) / opt.output_size.width;
 
             if let Some(t) = grid[index].collapsed() {
                 trace!("draw {}, {}", x, y);
