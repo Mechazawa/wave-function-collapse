@@ -139,16 +139,12 @@ fn main() {
                 let target = (*index) as i32 + offset;
 
                 if let Some(cell) = grid.get(target as usize) {
-                    if cell.possible.len() == 0 {
-                        // todo, this prevents a lockup for now
-                        // need to revert if this happens
-                        continue;
+                    if cell.entropy() < base_state.entropy() {
+                        neighbors.insert(
+                            direction,
+                            cell.possible.iter().map(|t| t.get_id()).collect(),
+                        );
                     }
-
-                    neighbors.insert(
-                        direction,
-                        cell.possible.iter().map(|t| t.get_id()).collect(),
-                    );
                 }
             }
 
@@ -159,14 +155,17 @@ fn main() {
         // sort the stack; entropy ascending
         stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
 
-        for id in &stack {
-            if grid[*id].collapsed().is_some() {
-                collapse_stack.push((*id, true));
+        let mut stack_next = vec![];
+
+        for &id in &stack {
+            if grid[id].collapsed().is_some() {
+                collapse_stack.push((id, true));
+            } else {
+                stack_next.push(id);
             }
         }
 
-        // collapse lowest entropy
-        stack.retain(|v| grid[*v].collapsed().is_none());
+        stack = stack_next;
 
         if let Some(&lowest) = &stack.get(0) {
             if grid[lowest].entropy() == 0 {

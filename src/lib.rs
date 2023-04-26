@@ -229,7 +229,7 @@ where
     }
 
     pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<u64>>) {
-        if self.entropy() > 1 {
+        if neighbors.len() > 0 && self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
 
             // assert!(self.entropy() > 0);
