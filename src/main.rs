@@ -17,7 +17,7 @@ use rand::Rng;
 use rusttype::{Font, Scale};
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-use sdl2::Sdl;
+use sdl2::{Sdl, EventPump};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use sprite::Sprite;
 use std::fmt::Debug;
@@ -70,6 +70,7 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
 struct SdlDraw {
     context: Sdl,
     canvas: Canvas<Window>,
+    events: EventPump,
     fps: Option<u32>,
 }
 
@@ -94,10 +95,13 @@ impl SdlDraw {
             .map_err(|e| e.to_string())
             .unwrap();
 
+        let events = context.event_pump().unwrap();
+
         Self {
             context,
             canvas,
             fps,
+            events,
         }
     }
 }
@@ -170,6 +174,8 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
+    use sdl2::{event::Event, keyboard::Keycode};
+
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -251,8 +257,20 @@ fn main() {
         progress.set_position(max_progress - wfc.remaining() as u64);
         wfc.tick();
 
-        if let Some(mut draw) = sdlDraw.as_mut() {
-            update_canvas(&wfc.grid, &mut draw);
+        {
+            if let Some(mut draw) = sdlDraw.as_mut() {
+                for event in draw.events.poll_iter() {
+                    match event {
+                        Event::Quit { .. }
+                        | Event::KeyDown {
+                            keycode: Some(Keycode::Escape),
+                            ..
+                        } => return,
+                        _ => {}
+                    }
+                }
+                update_canvas(&wfc.grid, &mut draw);
+            }
         }
     }
 
@@ -310,13 +328,7 @@ fn main() {
 fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
     use sdl2::{pixels::PixelFormatEnum, rect::Rect};
 
-    let (tile_width, tile_height) = grid
-        .get(0, 0)
-        .unwrap()
-        .possible[0]
-        .value
-        .image
-        .dimensions();
+    let (tile_width, tile_height) = grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
 
     context.canvas.clear();
     let texture_creator = context.canvas.texture_creator();
