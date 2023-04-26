@@ -1,4 +1,5 @@
-mod lib;
+mod wfc;
+mod grid;
 
 use image::GenericImageView;
 use image::Rgba;
@@ -19,10 +20,12 @@ use std::rc::Rc;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
-use lib::Direction;
-use lib::Size;
-use lib::SuperState;
-use lib::Tile;
+use grid::Direction;
+use wfc::Size;
+use wfc::SuperState;
+use wfc::Tile;
+
+use crate::grid::Grid;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -102,7 +105,8 @@ fn main() {
         possible: tiles.iter().cloned().map(Rc::new).collect(),
     };
 
-    let mut grid = vec![base_state.clone(); opt.output_size.area() as usize];
+    // let mut grid = vec![base_state.clone(); opt.output_size.area() as usize];
+    let mut grid = Grid::new(opt.output_size.width, opt.output_size.height, |_,_| base_state.clone());
 
     let mut stack: Vec<usize> = (0..grid.len()).collect();
     let mut rng = thread_rng();
