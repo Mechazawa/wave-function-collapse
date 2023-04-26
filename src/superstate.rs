@@ -86,8 +86,8 @@ where
                     i += 1;
                 }
             }
-        }
 
-        self.update_entropy();
+            self.update_entropy();
+        }
     }
 }
