@@ -6,17 +6,21 @@ use image::Rgba;
 use image::{io::Reader as ImageReader, DynamicImage};
 use image::{ImageError, RgbaImage};
 use imageproc::drawing::draw_text_mut;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 use log::debug;
 use log::warn;
-use log::{info, trace};
+use log::info;
+use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::rngs::OsRng;
 use rand::prelude::SliceRandom;
-use rand::thread_rng;
 use rusttype::{Font, Scale};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
@@ -26,6 +30,7 @@ use wfc::SuperState;
 use wfc::Tile;
 
 use crate::grid::Grid;
+use crate::wfc::Collapsable;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -66,6 +71,9 @@ struct Opt {
         help = "Output image grid size"
     )]
     output_size: Size,
+
+    #[structopt(parse(try_from_str), short, long, help = "Random seed")]
+    seed: Option<u64>,
 }
 
 fn main() {
@@ -101,18 +109,23 @@ fn main() {
         warn!("Retained {} tiles", tiles.len());
     }
 
-    let base_state = SuperState {
-        possible: tiles.iter().cloned().map(Rc::new).collect(),
-    };
+    let base_state = SuperState::new(tiles.iter().cloned().map(Rc::new).collect());
 
     // let mut grid = vec![base_state.clone(); opt.output_size.area() as usize];
-    let mut grid = Grid::new(opt.output_size.width, opt.output_size.height, &mut |_, _| {
-        base_state.clone()
-    });
+    let mut grid = Grid::new(
+        opt.output_size.width,
+        opt.output_size.height,
+        &mut |_, _| base_state.clone(),
+    );
 
     let mut stack: Vec<(usize, usize)> = grid.iter().map(|(x, y, _)| (x, y)).collect();
 
-    let mut rng = thread_rng();
+    let seed = opt.seed.unwrap_or(OsRng.gen());
+
+    info!("Using seed: {}", seed);
+
+    let mut rng = StdRng::seed_from_u64(seed);
+
     let (image_width, image_height) = opt.input.dimensions();
     let tile_width = image_width / opt.input_size.width as u32;
     let tile_height = image_height / opt.input_size.height as u32;
@@ -130,14 +143,23 @@ fn main() {
 
         grid.get_mut(x, y).unwrap().collapse(&mut rng);
 
-        trace!("stack: {:?}", stack);
         debug!("Starting at ({}, {})", x, y);
     }
 
+    let progress = ProgressBar::new(stack.len() as u64);
+
+    progress.enable_steady_tick(Duration::from_millis(200));
+    progress.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {per_sec}")
+        .unwrap()
+        .progress_chars("#>-"));
+
+
     // todo rollback when tick result is 0
     // otherwise it'll cascade
+    let max_progress = stack.len() as u64;
     while stack.len() > 0 {
-        info!("stack {}", stack.len());
+        progress.set_position(max_progress - stack.len() as u64);
 
         // todo: optimise to only test positions near collapsed
         // test all positions
@@ -182,9 +204,12 @@ fn main() {
         if let Some(&(x, y)) = stack.get(0) {
             if grid.get(x, y).unwrap().entropy() == 0 {
                 loop {
-                    let (lx, ly, implicit) = collapse_stack.pop().unwrap();
+                    let (lx, ly, implicit) = match collapse_stack.pop() {
+                        None => break,
+                        Some(v) => v,
+                    };
 
-                    grid.set(lx, ly, base_state.clone());
+                    grid.set(lx, ly, base_state.clone()).unwrap();
 
                     stack.push((lx, ly));
 
@@ -195,7 +220,7 @@ fn main() {
 
                 // reset the entropy for other tiles
                 for &(x, y) in &stack {
-                    grid.set(x, y, base_state.clone());
+                    grid.set(x, y, base_state.clone()).unwrap();
                 }
 
                 // sort the stack again
@@ -206,62 +231,62 @@ fn main() {
                         .cmp(&grid.get(b.0, b.1).unwrap().entropy())
                 });
 
-                warn!("Backtracking");
+                // warn!("Backtracking");
             } else {
                 grid.get_mut(x, y).unwrap().collapse(&mut rng);
                 collapse_stack.push((x, y, false));
             }
         }
+    }
 
-        // draw
-        let mut canvas = RgbaImage::new(
-            opt.output_size.width as u32 * tile_width,
-            opt.output_size.height as u32 * tile_height,
-        );
+    let mut canvas = RgbaImage::new(
+        opt.output_size.width as u32 * tile_width,
+        opt.output_size.height as u32 * tile_height,
+    );
 
-        for (x, y, cell) in &grid {
-            if let Some(t) = cell.collapsed() {
-                image::imageops::overlay(
-                    &mut canvas,
-                    &t.sprite.image,
-                    x as i64 * tile_width as i64,
-                    y as i64 * tile_height as i64,
-                );
-            } else {
-                let scale = Scale::uniform(8.0);
-                let color = Rgba([255, 0, 0, 255]); // red
-                let text = format!("{}", cell.entropy());
-
-                draw_text_mut(
-                    &mut canvas,
-                    color,
-                    x as i32 * tile_width as i32,
-                    y as i32 * tile_height as i32,
-                    scale,
-                    &font,
-                    &text,
-                );
-            }
-        }
-
-        // todo temporary for making animation
-        let file_name: String = opt
-            .output
-            .as_path()
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into();
-
-        if file_name.contains("{}") {
-            let mut path = opt.output.clone();
-            let new_name = file_name.replace("{}", format!("{:05}", stack.len()).as_str());
-
-            path.set_file_name(new_name);
-
-            canvas.save(path).unwrap();
+    for (x, y, cell) in &grid {
+        if let Some(t) = cell.collapsed() {
+            image::imageops::overlay(
+                &mut canvas,
+                &t.sprite.image,
+                x as i64 * tile_width as i64,
+                y as i64 * tile_height as i64,
+            );
         } else {
-            canvas.save(opt.output.as_path()).unwrap();
+            let scale = Scale::uniform(8.0);
+            let color = Rgba([255, 0, 0, 255]); // red
+            let text = format!("{}", cell.entropy());
+
+            draw_text_mut(
+                &mut canvas,
+                color,
+                x as i32 * tile_width as i32,
+                y as i32 * tile_height as i32,
+                scale,
+                &font,
+                &text,
+            );
         }
+    }
+
+    // draw
+    // todo temporary for making animation
+    let file_name: String = opt
+        .output
+        .as_path()
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into();
+
+    if file_name.contains("{}") {
+        let mut path = opt.output.clone();
+        let new_name = file_name.replace("{}", format!("{:05}", stack.len()).as_str());
+
+        path.set_file_name(new_name);
+
+        canvas.save(path).unwrap();
+    } else {
+        canvas.save(opt.output.as_path()).unwrap();
     }
 }
