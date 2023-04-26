@@ -127,7 +127,7 @@ fn main() {
         .filter(|c| *c != 4)
         .collect::<Vec<usize>>();
 
-    if invalid_neighbors.len() > 0 {
+    if !invalid_neighbors.is_empty() {
         warn!(
             "Found {} tiles with invalid amount of neighbors: {:?}",
             invalid_neighbors.len(),
@@ -222,7 +222,7 @@ fn main() {
         .into();
 
     if file_name.contains("{}") {
-        let mut path = opt.output.clone();
+        let mut path = opt.output;
         let new_name = file_name.replace("{}", format!("{:05}", wfc.remaining()).as_str());
 
         path.set_file_name(new_name);
