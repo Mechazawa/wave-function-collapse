@@ -1,9 +1,34 @@
+use core::str::FromStr;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Direction {
     Up,
     Down,
     Left,
     Right,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Size {
+    pub width: usize,
+    pub height: usize,
+}
+
+impl FromStr for Size {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (raw_width, raw_height) = s.split_once('x').ok_or(format!("invalid format: {}", s))?;
+
+        let width = raw_width
+            .parse::<usize>()
+            .map_err(|_| format!("invalid width: {}", raw_width))?;
+        let height = raw_height
+            .parse::<usize>()
+            .map_err(|_| format!("invalid height: {}", raw_height))?;
+
+        Ok(Size { width, height })
+    }
 }
 
 pub struct Grid<T> {
