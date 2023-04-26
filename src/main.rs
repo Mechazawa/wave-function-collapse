@@ -124,10 +124,12 @@ fn main() {
         debug!("Starting at index {}", top);
     }
 
+    // todo rollback when tick result is 0
+    // otherwise it'll cascade
     while stack.len() > 0 {
         info!("stack {}", stack.len());
 
-        // todo: optimise to only test top x positions
+        // todo: optimise to only test positions near collapsed
         // test all positions
         for index in stack.iter() {
             let mut neighbors: HashMap<Direction, Vec<u64>> = HashMap::new();
@@ -136,6 +138,12 @@ fn main() {
                 let target = (*index) as i32 + offset;
 
                 if let Some(cell) = grid.get(target as usize) {
+                    if cell.possible.len() == 0 {
+                        // todo, this prevents a lockup for now
+                        // need to revert if this happens
+                        continue;
+                    }
+
                     neighbors.insert(
                         direction,
                         cell.possible.iter().map(|t| t.get_id()).collect(),
