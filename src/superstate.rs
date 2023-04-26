@@ -1,5 +1,5 @@
 use crate::grid::Neighbors;
-use rand::rngs::StdRng;
+use rand::RngCore;
 use rand::seq::SliceRandom;
 use std::rc::Rc;
 
@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub fn collapse(&mut self, tick: u32, rng: &mut StdRng) {
+    pub fn collapse(&mut self, tick: u32, rng: &mut dyn RngCore) {
         if self.entropy() > 1 {
             self.last_tick = tick;
             self.possible = vec![self.possible.choose(rng).unwrap().clone()];

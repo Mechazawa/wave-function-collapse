@@ -1,7 +1,7 @@
-use log::debug;
+use log::{debug, trace, warn};
+use rand::{RngCore, SeedableRng};
 use rand::prelude::SliceRandom;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 use crate::grid::{Grid, Neighbors};
 use crate::superstate::{Collapsable, SuperState};
@@ -14,11 +14,12 @@ where
     T: Collapsable + Clone,
 {
     pub grid: Grid<SuperState<T>>,
-    rng: StdRng,
+    rng: Box<dyn RngCore>,
     stack: Vec<Position>,
     collapse_stack: Vec<CollapsedItem>,
     base: Grid<SuperState<T>>,
     ticks: u32,
+    rollbacks: u16,
 }
 
 impl<T> WaveFuncCollapse<T>
@@ -26,13 +27,14 @@ where
     T: Collapsable + Clone,
 {
     pub fn new(mut grid: Grid<SuperState<T>>, seed: u64) -> Self {
+        let mut rng = XorShiftRng::seed_from_u64(seed);
+
         let mut stack: Vec<Position> = grid.iter().map(|(x, y, _)| (x, y)).collect();
-        let mut rng = StdRng::seed_from_u64(seed);
-
+        let collapse_stack = Vec::with_capacity(stack.len());
+        
         stack.shuffle(&mut rng);
-
+        
         let (x, y) = stack.pop().unwrap();
-
         grid.get_mut(x, y).unwrap().collapse(0, &mut rng);
 
         debug!("Starting at ({}, {})", x, y);
@@ -41,9 +43,10 @@ where
             base: grid.clone(),
             grid,
             stack,
-            rng,
-            collapse_stack: Vec::new(),
+            rng: Box::new(rng),
+            collapse_stack,
             ticks: 0,
+            rollbacks: 0,
         }
     }
 
@@ -98,6 +101,7 @@ where
         // Either rollback if lowest entropy is zero or collapse it.
         if let Some(&(x, y)) = self.stack.first() {
             if self.grid.get(x, y).unwrap().entropy() == 0 {
+                self.collapse_stack.push((x, y, true));
                 self.rollback();
             } else {
                 self.grid
@@ -105,6 +109,10 @@ where
                     .unwrap()
                     .collapse(self.ticks, &mut self.rng);
                 self.collapse_stack.push((x, y, false));
+
+                if self.rollbacks > 0 {
+                    self.rollbacks -= 1;
+                }
             }
         }
     }
@@ -117,18 +125,49 @@ where
         base_state
     }
 
+    pub fn reset(&mut self) {
+        for &(x, y, _) in &self.collapse_stack {
+            self.grid.set(x, y, self.new_base(x, y)).unwrap();
+
+            self.stack.push((x, y));
+        }
+
+        self.collapse_stack = Vec::with_capacity(self.stack.len());
+        self.rollbacks = 0;
+
+        assert!(self.stack.len() <= self.grid.size());
+    }
+
     pub fn rollback(&mut self) {
+        self.rollbacks += 5;
+
+        let mut steps = 1 + (self.rollbacks / 100);
+
+        if steps > 1 {
+            trace!("Rollback score: {}, steps: {steps}", self.rollbacks);
+        }
+
+        if steps > 5 {
+            warn!("Lockup detected, resetting...");
+            
+            self.reset();
+        }
+
         loop {
-            let (lx, ly, implicit) = match self.collapse_stack.pop() {
+            let (x, y, implicit) = match self.collapse_stack.pop() {
                 None => break,
                 Some(v) => v,
             };
 
-            self.grid.set(lx, ly, self.new_base(lx, ly)).unwrap();
+            self.grid.set(x, y, self.new_base(x, y)).unwrap();
 
-            self.stack.push((lx, ly));
+            self.stack.push((x, y));
 
-            if !implicit {
+            if implicit {
+                steps -= 1;
+            }
+
+            if steps == 0 {
                 break;
             }
         }
