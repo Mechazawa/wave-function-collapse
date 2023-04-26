@@ -1,10 +1,9 @@
 use crate::grid::Neighbors;
-use rand::RngCore;
 use rand::seq::SliceRandom;
+use rand::RngCore;
 use std::rc::Rc;
 
-pub trait Collapsable
-{
+pub trait Collapsable {
     type Identifier;
     fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
@@ -17,6 +16,7 @@ where
 {
     pub possible: Vec<Rc<T>>,
     pub last_tick: u32,
+    base_entropy: usize,
 }
 
 impl<T> SuperState<T>
@@ -24,7 +24,17 @@ where
     T: Collapsable,
 {
     pub(crate) fn new(possible: Vec<Rc<T>>) -> Self {
-        Self { possible, last_tick: 0 }
+        let base_entropy = possible.len();
+
+        Self {
+            possible,
+            last_tick: 0,
+            base_entropy,
+        }
+    }
+
+    pub fn collapsing(&self) -> bool {
+        self.base_entropy != self.entropy()
     }
 
     pub fn entropy(&self) -> usize {
