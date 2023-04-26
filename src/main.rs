@@ -207,8 +207,6 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
-    use rand::{thread_rng, RngCore};
-
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -322,6 +320,11 @@ fn main() {
         wfc.tick();
     }
 
+    #[cfg(feature = "sdl2")]
+    if let Some(draw) = sdl_draw.as_mut() {
+        update_canvas(&wfc, draw);
+    }
+
     progress.finish();
 
     #[cfg(feature = "sdl2")]
@@ -390,6 +393,8 @@ fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
                 tile_width,
                 tile_height,
             );
+            context.canvas.set_draw_color(Color::GRAY);
+            context.canvas.fill_rect(rect).unwrap();
             context.canvas.copy(texture, None, Some(rect)).unwrap();
         } else {
             let color = if cell.entropy() > 0 {

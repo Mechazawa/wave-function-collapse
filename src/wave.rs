@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use log::trace;
 use rand::seq::{IteratorRandom, SliceRandom};
-use rand::{thread_rng, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use crate::grid::{Direction, Grid, Neighbors, Position};
@@ -167,22 +167,31 @@ where
         }
 
         // filter for edge
-        let choices: Vec<Position> = positions
+        let mut choices: Vec<_> = positions
             .iter()
             .filter(|(_, _, entropy)| entropy == lowest)
-            .map(|&(x, y, _)| (x, y))
-            .filter(|(x, y)| {
-                self.grid
-                    .get_neighbors(*x, *y)
-                    .values()
-                    .any(|&cell| cell.is_some() && cell.unwrap().entropy() == 1)
+            .map(|&(x, y, _)| {
+                (
+                    x,
+                    y,
+                    self.grid
+                        .get_neighbors(x, y)
+                        .iter()
+                        .filter(|(_, s)| s.is_some() && s.unwrap().entropy() == 1)
+                        .count(),
+                )
             })
+            .filter(|(_, _, n)| *n > 0)
             .collect();
 
         if choices.is_empty() {
             None
         } else {
-            let &(x, y) = choices.choose(&mut self.rng).unwrap();
+            choices.sort_by(|(_, _, a), (_, _, b)| b.cmp(a));
+
+            let &(x, y, _) = choices
+                .choose_weighted(&mut self.rng, |(_, _, n)| *n)
+                .unwrap();
 
             self.collapse(x, y);
 
