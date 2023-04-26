@@ -44,10 +44,12 @@ where
         self.base_entropy != self.entropy()
     }
 
+    #[inline]
     pub fn entropy(&self) -> usize {
         self.entropy
     }
 
+    #[inline]
     fn update_entropy(&mut self) {
         self.entropy = self.possible.len();
     }
