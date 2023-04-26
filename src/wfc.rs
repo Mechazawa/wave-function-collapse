@@ -94,6 +94,10 @@ where
         //   - push to stack
         //   - tick only updated side with new value
         // repeat untill the stack is empty
+        // We can prepare the tick neighbor list argument by keeping those in a grid.
+        // This way we can also prevent the stack getting filled with duplicate cells to tick
+        // Make sure we don't use recursions
+        // We can thread this if we want in the future
         for index in 0..self.stack.len() {
             let (x, y) = self.stack[index];
 
