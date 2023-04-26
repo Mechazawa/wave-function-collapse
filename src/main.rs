@@ -161,10 +161,10 @@ fn main() {
         stack_next.reserve_exact(stack.len());
 
         for &id in &stack {
-            if grid[id].collapsed().is_some() {
-                collapse_stack.push((id, true));
-            } else {
-                stack_next.push(id);
+            match grid[id].entropy() {
+                0 => panic!("{} has no entropy left", id),
+                1 => collapse_stack.push((id, true)),
+                _ => stack_next.push(id),
             }
         }
 
