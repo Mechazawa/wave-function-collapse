@@ -3,11 +3,13 @@ use image::GenericImageView;
 use image::ImageBuffer;
 use image::Pixel;
 use log::debug;
+use log::trace;
 use num_traits::cast::ToPrimitive;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -68,19 +70,19 @@ pub struct Sprite {
 pub struct Tile {
     pub sprite: Rc<Sprite>,
     /// todo: neighbours per side
-    pub neighbors: HashMap<Direction, HashMap<u64, Rc<Self>>>,
+    pub neighbors: HashMap<Direction, HashSet<u64>>,
 
     id: u64,
 }
 
 impl Tile {
-    pub fn get_tile_set(image: &DynamicImage, grid_size: &Size) -> Vec<Rc<Self>> {
+    pub fn get_tile_set(image: &DynamicImage, grid_size: &Size) -> Vec<Self> {
         let (image_width, image_height) = image.dimensions();
         let tile_width = image_width / grid_size.width;
         let tile_height = image_height / grid_size.height;
 
-        let mut unique: HashMap<u64, Rc<Self>> = Default::default();
-        let mut grid: Vec<Rc<Self>> = Default::default();
+        let mut unique: HashMap<u64, Self> = Default::default();
+        let mut grid: Vec<u64> = Default::default();
 
         debug!("Generating tiles");
 
@@ -91,41 +93,42 @@ impl Tile {
                 let buffer =
                     ImageBuffer::from_fn(tile_width, tile_height, |x, y| view.get_pixel(x, y));
 
-                let new_tile = Rc::new(Tile::new(DynamicImage::from(buffer)));
+                let new_tile = Tile::new(DynamicImage::from(buffer));
+                let tile_id = new_tile.get_id();
 
-                unique.insert(new_tile.get_id(), new_tile.clone());
+                unique.insert(tile_id, new_tile);
 
-                let tile = unique.get(&new_tile.get_id()).unwrap();
+                let tile = unique.get(&tile_id).unwrap();
 
-                grid.push(tile.clone());
+                grid.push(tile.get_id());
             }
         }
 
         debug!("Populating neighbors");
 
         for index in 0..grid.len() {
-            let mut tile_ref = grid[index].clone();
+            let tile = unique.get_mut(&grid[index]).unwrap();
 
             for (direction, offset) in grid_size.get_offsets() {
                 let target = index as i32 + offset;
 
                 if let Some(value) = grid.get(target as usize) {
-                    let tile = Rc::make_mut(&mut tile_ref);
-
                     tile.neighbors
                         .entry(direction)
-                        .or_insert_with(HashMap::new)
-                        .insert(value.get_id(), Rc::clone(&value));
+                        .or_insert_with(HashSet::new)
+                        .insert(*value);
                 }
             }
 
-            assert!(tile_ref.neighbors.len() > 0);
+            assert!(tile.neighbors.len() > 0);
 
             // todo: ?????
-            unique.insert(tile_ref.get_id(), tile_ref);
+            // unique.insert(tile_ref.get_id(), tile_ref);
+
+            trace!("{}: {:?}", tile.get_id(), tile.neighbors);
         }
 
-        let output = unique.values().cloned().collect::<Vec<Rc<Self>>>();
+        let output = unique.values().cloned().collect::<Vec<Self>>();
 
         for tile in output.iter() {
             assert!(tile.neighbors.len() > 0);
@@ -171,29 +174,28 @@ impl Tile {
 }
 
 pub trait Collapsable {
-    fn test(&self, neighbors: &HashMap<Direction, Vec<Rc<Self>>>) -> bool;
+    fn test(&self, neighbors: &HashMap<Direction, Vec<u64>>) -> bool;
 }
 
 impl Collapsable for Tile {
-    fn test(&self, neighbors: &HashMap<Direction, Vec<Rc<Self>>>) -> bool {
-        let mut valid = 0;
-
-        assert!(self.neighbors.len() > 0);
-
+    fn test(&self, neighbors: &HashMap<Direction, Vec<u64>>) -> bool {
         for (direction, tiles) in neighbors {
-            let possible = self.neighbors.get(direction).expect(format!("Missing neighbor {:?}", direction).as_str());
-            
+            let possible = self.neighbors.get(direction).expect("Missing neighbor");
+
+            let mut found = false;
+
             for tile in tiles {
-                if possible.contains_key(&tile.get_id()) {
-                    valid += 1;
-                    break;
+                if possible.contains(tile) {
+                    found = true;
                 }
+            }
+
+            if !found {
+                return false;
             }
         }
 
-        assert!(valid <= neighbors.len());
-
-        valid == neighbors.len()
+        true
     }
 }
 
@@ -226,7 +228,7 @@ where
         }
     }
 
-    pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<Rc<T>>>) {
+    pub fn tick(&mut self, neighbors: &HashMap<Direction, Vec<u64>>) {
         if self.entropy() > 1 {
             self.possible.retain(|v| v.test(&neighbors));
 

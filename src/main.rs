@@ -5,6 +5,7 @@ use image::Rgba;
 use image::{io::Reader as ImageReader, DynamicImage};
 use image::{ImageError, RgbaImage};
 use imageproc::drawing::draw_text_mut;
+use log::debug;
 use log::warn;
 use log::{info, trace};
 use rand::prelude::SliceRandom;
@@ -79,19 +80,27 @@ fn main() {
 
     info!("{} unique tiles found", tiles.len());
 
-    let base_state = SuperState {
-        possible: tiles.clone(),
-    };
+    let invalid_neighbors = tiles
+        .iter()
+        .map(|t| t.neighbors.keys().len())
+        .filter(|c| *c != 4)
+        .collect::<Vec<usize>>();
 
-    let invalid_neighbors = tiles.iter().map(|t| t.neighbors.keys().len()).filter(|c| *c != 4).collect::<Vec<usize>>();
-    
     if invalid_neighbors.len() > 0 {
-        warn!("Found {} tiles with invalid amount of neighbors: {:?}", invalid_neighbors.len(), invalid_neighbors);
+        warn!(
+            "Found {} tiles with invalid amount of neighbors: {:?}",
+            invalid_neighbors.len(),
+            invalid_neighbors
+        );
 
         tiles.retain(|t| t.neighbors.len() == 4);
 
         warn!("Retained {} tiles", tiles.len());
     }
+
+    let base_state = SuperState {
+        possible: tiles.iter().cloned().map(Rc::new).collect(),
+    };
 
     let mut grid = vec![base_state.clone(); opt.output_size.area() as usize];
 
@@ -103,9 +112,17 @@ fn main() {
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
-    // todo: it always starts in left-bottom??
-    grid.shuffle(&mut rng);
-    grid[stack.pop().unwrap()].collapse(&mut rng);
+    {
+        // todo: it always starts in left-bottom??
+        stack.shuffle(&mut rng);
+
+        let top = stack.pop().unwrap();
+
+        grid[top].collapse(&mut rng);
+
+        trace!("stack: {:?}", stack);
+        debug!("Starting at index {}", top);
+    }
 
     while stack.len() > 0 {
         info!("stack {}", stack.len());
@@ -113,13 +130,16 @@ fn main() {
         // todo: optimise to only test top x positions
         // test all positions
         for index in stack.iter() {
-            let mut neighbors: HashMap<Direction, Vec<Rc<Tile>>> = HashMap::new();
+            let mut neighbors: HashMap<Direction, Vec<u64>> = HashMap::new();
 
             for (direction, offset) in opt.output_size.get_offsets() {
                 let target = (*index) as i32 + offset;
 
                 if let Some(cell) = grid.get(target as usize) {
-                    neighbors.insert(direction, cell.possible.clone());
+                    neighbors.insert(
+                        direction,
+                        cell.possible.iter().map(|t| t.get_id()).collect(),
+                    );
                 }
             }
 
@@ -132,7 +152,10 @@ fn main() {
 
         // collapse lowest entropy
         stack.retain(|v| grid[*v].entropy() > 1);
-        grid[stack.pop().unwrap()].collapse(&mut rng);
+
+        if let Some(top) = stack.pop() {
+            grid[top].collapse(&mut rng);
+        }
 
         stack.reverse();
 
@@ -148,9 +171,9 @@ fn main() {
             let x = (index as u32) % opt.output_size.width;
             let y = (index as u32) / opt.output_size.width;
 
-            trace!("draw {}, {}", x, y);
-
             if let Some(t) = grid[index].collapsed() {
+                trace!("draw I {}, {} => {}", x, y, t.get_id());
+
                 image::imageops::overlay(
                     &mut canvas,
                     &t.sprite.image,
@@ -158,6 +181,8 @@ fn main() {
                     (y * tile_height) as i64,
                 );
             } else {
+                trace!("draw E {}, {}", x, y);
+
                 let scale = Scale::uniform(6.0);
                 let color = Rgba([255, 0, 0, 255]); // red
                 let text = format!("{}", grid[index].entropy());
