@@ -63,6 +63,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub fn tick(&mut self) -> bool {
         if self.stack.is_empty() && self.maybe_collapse().is_none() {
             return false;
@@ -75,6 +76,7 @@ where
         true
     }
 
+    #[allow(dead_code)]
     pub fn tick_once(&mut self) -> Option<Position> {
         if let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);
@@ -256,13 +258,7 @@ where
 
             self.grid.set(x, y, value).unwrap();
 
-            let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
-                None => Vec::new(),
-                Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
-            });
-
             self.mark(x, y);
-            self.data.set(x, y, Some(data)).unwrap();
             self.stack.push_back((x, y));
         }
     }
