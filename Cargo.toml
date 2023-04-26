@@ -17,3 +17,7 @@ rusttype = "0.9.3"
 simplelog = { version = "0.12.1", features = ["paris"] }
 structopt = "0.3.26"
 structopt-flags = "0.3"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "/usr/bin/clang"
+rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
