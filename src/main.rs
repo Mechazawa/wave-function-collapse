@@ -2,7 +2,6 @@ mod grid;
 mod sprite;
 mod superstate;
 mod tile;
-mod wfc;
 mod wave;
 
 
@@ -18,7 +17,7 @@ use rand::Rng;
 
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-use sdl2::{Sdl, EventPump};
+use sdl2::EventPump;
 use sdl2::{event::Event, keyboard::Keycode};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use sprite::Sprite;
@@ -41,7 +40,6 @@ use tile::Tile;
 use crate::grid::Grid;
 use wave::Wave;
 use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
-use crate::wfc::WaveFuncCollapse;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -162,8 +160,6 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
-    use crate::wave::Wave;
-
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -218,7 +214,6 @@ fn main() {
     let progress = ProgressBar::new(grid.size() as u64);
     // let mut wfc = WaveFuncCollapse::new(grid, seed);
     let mut wfc = Wave::new(grid);
-    wfc.collapse_any();
 
     progress.enable_steady_tick(Duration::from_millis(200));
     progress.set_style(

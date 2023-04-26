@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use log::trace;
+use log::{trace, warn};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{thread_rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -56,7 +56,9 @@ where
             let success = self.collapse_edge();
 
             if !success {
-                return false;
+                trace!("Failed to find edge to collapse");
+                
+                return self.collapse_any();
             }
         }
 
@@ -87,7 +89,7 @@ where
 
         if cell.entropy() == 0 {
             self.rollback(1);
-        } else if old_entropy > cell.entropy() {
+        } else if old_entropy != cell.entropy() {
             self.mark(x, y);
         }
     }
@@ -128,7 +130,11 @@ where
             .map(|(_, _, e)| e)
             .filter(|&&e| e > 1)
             .min()
-            .unwrap();
+            .unwrap_or(&0);
+
+        if *lowest == 0 {
+            return false;
+        }
 
         // filter for edge
         let choices: Vec<Position> = positions
@@ -190,6 +196,7 @@ where
 
     fn rollback(&mut self, mut count: usize) {
         assert!(count > 0, "Rollback count must be at least 1");
+        warn!("Rollback {count}");
 
         // empty stack
         self.stack.clear();
@@ -214,20 +221,15 @@ where
         let positions: Vec<Position> = self
             .grid
             .iter()
-            .filter(|&(_, _, cell)| cell.entropy() > 1 && cell.entropy() < cell.base_entropy())
+            .filter(|&(_, _, cell)| cell.entropy() > 1 && cell.collapsing())
             .map(|(x, y, _)| (x, y))
             .collect();
 
         for (x, y) in positions {
-            let mut value = self.grid_base.get(x, y).unwrap().clone();
-            let neighbors = self.grid.get_neighbors(x, y).map(|_, n| match n {
-                Some(neighbors) => neighbors.possible.iter().map(|v| v.get_id()).collect(),
-                None => Vec::with_capacity(0),
-            });
-
-            value.tick(0, &neighbors);
+            let value = self.grid_base.get(x, y).unwrap().clone();
 
             self.grid.set(x, y, value).unwrap();
+            self.mark(x, y);
         }
     }
 }
