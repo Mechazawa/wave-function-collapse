@@ -33,6 +33,10 @@ where
         }
     }
 
+    pub fn base_entropy(&self) -> usize {
+        self.base_entropy
+    }
+
     pub fn collapsing(&self) -> bool {
         self.base_entropy != self.entropy()
     }

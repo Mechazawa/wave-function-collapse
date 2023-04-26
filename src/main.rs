@@ -269,7 +269,7 @@ fn main() {
                         _ => {}
                     }
                 }
-                update_canvas(&wfc.grid, draw);
+                update_canvas(&wfc, draw);
             }
         }
     }
@@ -309,19 +309,20 @@ fn main() {
 
 // todo only draw updated
 #[cfg(feature = "sdl2")]
-fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
+fn update_canvas(wfc: &WaveFuncCollapse<Tile<Sprite>>, context: &mut SdlDraw) {
     use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
 
-    let (tile_width, tile_height) = grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
+    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
 
-    context.canvas.clear();
+    // context.canvas.clear();
     let texture_creator = context.canvas.texture_creator();
 
-    let ttf_context = sdl2::ttf::init().unwrap();
-    let font = ttf_context.load_font("src/PublicPixel-z84yD.ttf", 8).unwrap();
+    // let ttf_context = sdl2::ttf::init().unwrap();
+    // let font = ttf_context.load_font("src/PublicPixel-z84yD.ttf", 8).unwrap();
 
+    for &(x, y) in wfc.get_updated() {
+        let cell = wfc.grid.get(x, y).unwrap();
 
-    for (x, y, cell) in grid {
         if let Some(_t) = cell.collapsed() {
             // todo streamline
             let mut texture = texture_creator
@@ -344,21 +345,19 @@ fn update_canvas(grid: &Grid<SuperState<Tile<Sprite>>>, context: &mut SdlDraw) {
             );
             context.canvas.copy(&texture, None, Some(rect)).unwrap();
         } else {
-            let text = format!("{}", cell.entropy());
+            let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
+            let red = (255.0 * (1.0 - ratio)) as u8;
+            let color = Color::RGB(red, 0, 0);
             
-            let surface = font.render(&text).solid(Color::RGB(255, 0, 0)).unwrap();
-            let texture = texture_creator
-                .create_texture_from_surface(&surface)
-                .map_err(|e| e.to_string())
-                .unwrap();
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
-                surface.width(),
-                surface.height(),
+                tile_width,
+                tile_height,
             );
         
-            context.canvas.copy(&texture, None, Some(rect)).unwrap();
+            context.canvas.set_draw_color(color);
+            context.canvas.fill_rect(rect).unwrap();
         }
     }
 
