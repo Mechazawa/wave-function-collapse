@@ -36,8 +36,9 @@ where
         }
     }
 
-    pub fn collapse(&mut self, rng: &mut StdRng) {
+    pub fn collapse(&mut self, tick: u32, rng: &mut StdRng) {
         if self.entropy() > 1 {
+            self.last_tick = tick;
             self.possible = vec![self.possible.choose(rng).unwrap().clone()];
         }
     }

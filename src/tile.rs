@@ -35,7 +35,7 @@ impl Tile {
             let buffer =
                 ImageBuffer::from_fn(tile_width, tile_height, |ix, iy| view.get_pixel(ix, iy));
 
-            let new_tile = Tile::new(DynamicImage::from(buffer));
+            let new_tile = Tile::new(DynamicImage::from(buffer), Default::default());
             let tile_id = new_tile.get_id();
 
             unique.insert(tile_id, new_tile);
@@ -77,7 +77,7 @@ impl Tile {
 }
 
 impl Tile {
-    pub fn new(image: DynamicImage) -> Self {
+    pub fn new(image: DynamicImage, neighbors: Neighbors<Vec<u64>>) -> Self {
         let mut hasher = DefaultHasher::new();
         let sprite = Sprite { image };
 
@@ -86,7 +86,7 @@ impl Tile {
         Self {
             id: hasher.finish(),
             sprite: Rc::new(sprite),
-            neighbors: Default::default(),
+            neighbors,
         }
     }
 }

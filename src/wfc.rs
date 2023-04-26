@@ -33,7 +33,7 @@ where
 
         let (x, y) = stack.pop().unwrap();
 
-        grid.get_mut(x, y).unwrap().collapse(&mut rng);
+        grid.get_mut(x, y).unwrap().collapse(0, &mut rng);
 
         debug!("Starting at ({}, {})", x, y);
 
@@ -69,15 +69,15 @@ where
                     let base_entropy = self.base.get(x, y).unwrap().entropy();
 
                     if cell.entropy() < base_entropy {
-                        do_test = true;
+                        do_test = do_test || cell.last_tick >= self.ticks - 1;
                         neighbors[direction] = cell.possible.iter().map(|t| t.get_id()).collect();
                     }
                 }
             }
 
-            // if do_test {
+            if do_test {
                 self.grid.get_mut(x, y).unwrap().tick(self.ticks, &neighbors);
-            // }
+            }
         }
 
         let mut stack_next = Vec::new();
@@ -91,6 +91,8 @@ where
             }
         }
 
+        self.stack = stack_next;
+
         // sort the stack; entropy ascending
         self.sort();
 
@@ -99,7 +101,7 @@ where
             if self.grid.get(x, y).unwrap().entropy() == 0 {
                 self.rollback();
             } else {
-                self.grid.get_mut(x, y).unwrap().collapse(&mut self.rng);
+                self.grid.get_mut(x, y).unwrap().collapse(self.ticks, &mut self.rng);
                 self.collapse_stack.push((x, y, false));
             }
         }
