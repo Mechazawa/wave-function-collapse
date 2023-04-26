@@ -304,6 +304,7 @@ where
                 let new_entropy = base.entropy();
 
                 if entropy != new_entropy {
+                    // todo: Remove recursion
                     self.rollback_propegate(nx, ny, Some(direction.invert()));
                 }
             }
