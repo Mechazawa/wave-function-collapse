@@ -25,6 +25,13 @@ where
     old_collapse_stack_len: usize,
 }
 
+pub struct Updated
+{
+    x: usize,
+    y: usize,
+    collapsed: bool,
+}
+
 impl<T> WaveFuncCollapse<T>
 where
     T: Collapsable + Clone,
@@ -50,6 +57,8 @@ where
             collapse_stack,
             ticks: 0,
             rollbacks: 0,
+            old_stack_len: 0,
+            old_collapse_stack_len: 0,
         }
     }
 
@@ -218,16 +227,43 @@ where
         });
     }
 
-    pub fn get_updated(&self) {
-        // before doing tick store lengths of both stacks (done)
-        // use what is new to build a list of {x,y,value:(Entropy(usize)|Collapsed(T))}
-        // return that
+    pub fn get_updated(&self) -> Vec<Updated> {
+        let stack_len = self.stack.len();
+        let stack_diff = if stack_len >= self.old_stack_len {
+            stack_len - self.old_stack_len
+        } else {
+            0
+        };
 
-        todo!();
+        let collapse_len = self.collapse_stack.len();
+        let collapse_diff = if collapse_len >= self.old_collapse_stack_len {
+            collapse_len - self.old_collapse_stack_len
+        } else {
+            0
+        };
+
+        let mut output = Vec::with_capacity(collapse_diff + stack_diff);
+
+        for i in stack_len..(stack_len - stack_diff) {
+            let item = self.stack[i];
+
+            output.push(Updated{
+                x: item.0,
+                y: item.1,
+                collapsed: false,
+            });
+        }
+
+        for i in collapse_len..(collapse_len - collapse_diff) {
+            let item = self.collapse_stack[i];
+
+            output.push(Updated{
+                x: item.0,
+                y: item.1,
+                collapsed: true,
+            });
+        }
+
+        output
     }
-
-    // enum Updated {
-    //     Entropy(usize), 
-    //     Collapsed(T)
-    // }
 }
