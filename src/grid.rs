@@ -18,7 +18,7 @@ pub struct GridIter<'a, T> {
 }
 
 impl<T> Grid<T> {
-    pub fn new<F: FnOnce(usize, usize) -> T>(width: usize, height: usize, initializer: F) -> Self {
+    pub fn new<F: FnMut(usize, usize) -> T>(width: usize, height: usize, initializer: &mut F) -> Self {
         let mut data = Vec::with_capacity(width * height);
 
         for y in 0..height {
@@ -35,7 +35,7 @@ impl<T> Grid<T> {
     }
 
     pub fn size(&self) -> usize {
-      self.width * self.height
+        self.width * self.height
     }
 
     pub fn iter(&self) -> GridIter<T> {
@@ -46,6 +46,12 @@ impl<T> Grid<T> {
         let index = x + (y * self.width);
 
         self.data.get(index)
+    }
+
+    pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
+        let index = x + (y * self.width);
+
+        self.data.get_mut(index)
     }
 
     pub fn set(&mut self, x: usize, y: usize, value: T) -> Result<(), &'static str> {
@@ -61,7 +67,7 @@ impl<T> Grid<T> {
     }
 
     pub fn get_neighbors(&self, x: usize, y: usize) -> Vec<(Direction, &T)> {
-        let output = Vec::with_capacity(4);
+        let mut output = Vec::with_capacity(4);
 
         for direction in [
             Direction::Up,

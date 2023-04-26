@@ -17,12 +17,12 @@ use std::str::FromStr;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Size {
-    pub width: u32,
-    pub height: u32,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl Size {
-    pub fn area(&self) -> u32 {
+    pub fn area(&self) -> usize {
         self.width * self.height
     }
 }
@@ -34,10 +34,10 @@ impl FromStr for Size {
         let (raw_width, raw_height) = s.split_once('x').ok_or(format!("invalid format: {}", s))?;
 
         let width = raw_width
-            .parse::<u32>()
+            .parse::<usize>()
             .map_err(|_| format!("invalid width: {}", raw_width))?;
         let height = raw_height
-            .parse::<u32>()
+            .parse::<usize>()
             .map_err(|_| format!("invalid height: {}", raw_height))?;
 
         Ok(Size { width, height })
@@ -62,13 +62,13 @@ pub struct Tile {
 impl Tile {
     pub fn get_tile_set(image: &DynamicImage, grid_size: &Size) -> Vec<Self> {
         let (image_width, image_height) = image.dimensions();
-        let tile_width = image_width / grid_size.width;
-        let tile_height = image_height / grid_size.height;
+        let tile_width = image_width / grid_size.width as u32;
+        let tile_height = image_height / grid_size.height as u32;
 
         let mut unique: HashMap<u64, Self> = Default::default();
 
         debug!("Generating tiles");
-        let mut grid = Grid::new(grid_size.width as usize, grid_size.height as usize, |x, y| {
+        let mut grid = Grid::new(grid_size.width as usize, grid_size.height as usize, &mut |x, y| {
             let view = image.view(x as u32 * tile_width, y as u32 * tile_height, tile_width, tile_height);
 
             let buffer =
@@ -85,7 +85,7 @@ impl Tile {
         debug!("Populating neighbors");
 
         for (x, y, tile_id) in &grid {
-            let tile = unique.get(&tile_id).unwrap();
+            let tile = unique.get_mut(&tile_id).unwrap();
 
             for (direction, value) in grid.get_neighbors(x, y) {
                 tile.neighbors

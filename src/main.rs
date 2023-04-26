@@ -1,5 +1,5 @@
-mod wfc;
 mod grid;
+mod wfc;
 
 use image::GenericImageView;
 use image::Rgba;
@@ -106,29 +106,32 @@ fn main() {
     };
 
     // let mut grid = vec![base_state.clone(); opt.output_size.area() as usize];
-    let mut grid = Grid::new(opt.output_size.width, opt.output_size.height, |_,_| base_state.clone());
+    let mut grid = Grid::new(opt.output_size.width, opt.output_size.height, &mut |_, _| {
+        base_state.clone()
+    });
 
-    let mut stack: Vec<usize> = (0..grid.len()).collect();
+    let mut stack: Vec<(usize, usize)> = grid.iter().map(|(x, y, _)| (x, y)).collect();
+
     let mut rng = thread_rng();
     let (image_width, image_height) = opt.input.dimensions();
-    let tile_width = image_width / opt.input_size.width;
-    let tile_height = image_height / opt.input_size.height;
+    let tile_width = image_width / opt.input_size.width as u32;
+    let tile_height = image_height / opt.input_size.height as u32;
     let font_data = include_bytes!("PublicPixel-z84yD.ttf"); // Use a font file from your system or project
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
-    let mut collapse_stack: Vec<(usize, bool)> = vec![];
+    let mut collapse_stack: Vec<(usize, usize, bool)> = vec![];
 
-    collapse_stack.reserve_exact(grid.len());
+    collapse_stack.reserve_exact(grid.size());
 
     {
         // todo: it always starts in left-bottom??
         stack.shuffle(&mut rng);
 
-        let top = stack.pop().unwrap();
+        let (x, y) = stack.pop().unwrap();
 
-        grid[top].collapse(&mut rng);
+        grid.get_mut(x, y).unwrap().collapse(&mut rng);
 
         trace!("stack: {:?}", stack);
-        debug!("Starting at index {}", top);
+        debug!("Starting at ({}, {})", x, y);
     }
 
     // todo rollback when tick result is 0
@@ -138,50 +141,52 @@ fn main() {
 
         // todo: optimise to only test positions near collapsed
         // test all positions
-        for index in stack.iter() {
+        for &(x, y) in &stack {
             let mut neighbors: HashMap<Direction, Vec<u64>> = HashMap::new();
 
-            for (direction, offset) in opt.output_size.get_offsets() {
-                let target = (*index) as i32 + offset;
-
-                if let Some(cell) = grid.get(target as usize) {
-                    if cell.entropy() < base_state.entropy() {
-                        neighbors.insert(
-                            direction,
-                            cell.possible.iter().map(|t| t.get_id()).collect(),
-                        );
-                    }
+            for (direction, cell) in grid.get_neighbors(x, y) {
+                if cell.entropy() < base_state.entropy() {
+                    neighbors.insert(
+                        direction,
+                        cell.possible.iter().map(|t| t.get_id()).collect(),
+                    );
                 }
             }
 
             // trace!("{}", index);
-            grid[*index].tick(&neighbors);
+            grid.get_mut(x, y).unwrap().tick(&neighbors);
         }
 
         let mut stack_next = Vec::new();
 
         stack_next.reserve_exact(stack.len());
 
-        for &id in &stack {
-            match grid[id].entropy() {
-                1 => collapse_stack.push((id, true)),
-                _ => stack_next.push(id),
+        for (x, y) in stack {
+            match grid.get(x, y).unwrap().entropy() {
+                1 => collapse_stack.push((x, y, true)),
+                _ => stack_next.push((x, y)),
             }
         }
 
         stack = stack_next;
 
         // sort the stack; entropy ascending
-        stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
+        // todo wrap in some sort of helper?
+        stack.sort_by(|a, b| {
+            grid.get(a.0, a.1)
+                .unwrap()
+                .entropy()
+                .cmp(&grid.get(b.0, b.1).unwrap().entropy())
+        });
 
-        if let Some(&lowest) = &stack.get(0) {
-            if grid[lowest].entropy() == 0 {
+        if let Some(&(x, y)) = stack.get(0) {
+            if grid.get(x, y).unwrap().entropy() == 0 {
                 loop {
-                    let (last, implicit) = collapse_stack.pop().unwrap();
+                    let (lx, ly, implicit) = collapse_stack.pop().unwrap();
 
-                    grid[last] = base_state.clone();
+                    grid.set(lx, ly, base_state.clone());
 
-                    stack.push(last);
+                    stack.push((lx, ly));
 
                     if implicit == false {
                         break;
@@ -189,47 +194,49 @@ fn main() {
                 }
 
                 // reset the entropy for other tiles
-                for &id in &stack {
-                    grid[id] = base_state.clone();
+                for &(x, y) in &stack {
+                    grid.set(x, y, base_state.clone());
                 }
 
                 // sort the stack again
-                stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
+                stack.sort_by(|a, b| {
+                    grid.get(a.0, a.1)
+                        .unwrap()
+                        .entropy()
+                        .cmp(&grid.get(b.0, b.1).unwrap().entropy())
+                });
 
                 warn!("Backtracking");
             } else {
-                grid[lowest].collapse(&mut rng);
-                collapse_stack.push((lowest, false));
+                grid.get_mut(x, y).unwrap().collapse(&mut rng);
+                collapse_stack.push((x, y, false));
             }
         }
 
         // draw
         let mut canvas = RgbaImage::new(
-            opt.output_size.width * tile_width,
-            opt.output_size.height * tile_height,
+            opt.output_size.width as u32 * tile_width,
+            opt.output_size.height as u32 * tile_height,
         );
 
-        for index in 0..grid.len() {
-            let x = (index as u32) % opt.output_size.width;
-            let y = (index as u32) / opt.output_size.width;
-
-            if let Some(t) = grid[index].collapsed() {
+        for (x, y, cell) in &grid {
+            if let Some(t) = cell.collapsed() {
                 image::imageops::overlay(
                     &mut canvas,
                     &t.sprite.image,
-                    (x * tile_width) as i64,
-                    (y * tile_height) as i64,
+                    x as i64 * tile_width as i64,
+                    y as i64 * tile_height as i64,
                 );
             } else {
                 let scale = Scale::uniform(8.0);
                 let color = Rgba([255, 0, 0, 255]); // red
-                let text = format!("{}", grid[index].entropy());
+                let text = format!("{}", cell.entropy());
 
                 draw_text_mut(
                     &mut canvas,
                     color,
-                    (x * tile_width) as i32,
-                    (y * tile_height) as i32,
+                    x as i32 * tile_width as i32,
+                    y as i32 * tile_height as i32,
                     scale,
                     &font,
                     &text,
@@ -238,12 +245,18 @@ fn main() {
         }
 
         // todo temporary for making animation
-        let file_name: String = opt.output.as_path().file_name().unwrap().to_string_lossy().into();
+        let file_name: String = opt
+            .output
+            .as_path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into();
 
         if file_name.contains("{}") {
             let mut path = opt.output.clone();
             let new_name = file_name.replace("{}", format!("{:05}", stack.len()).as_str());
-            
+
             path.set_file_name(new_name);
 
             canvas.save(path).unwrap();
