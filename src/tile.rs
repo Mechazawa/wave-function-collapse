@@ -1,11 +1,15 @@
-use crate::grid::{Grid, Neighbors};
-use crate::superstate::{Collapsable};
-use crate::sprite::Sprite;
+use crate::grid::Direction;
+use crate::grid::Grid;
+use crate::grid::Neighbors;
 use crate::grid::Size;
-use image::{DynamicImage, ImageBuffer};
+use crate::superstate::Collapsable;
+use crate::sprite::Sprite;
+use image::DynamicImage;
 use image::GenericImageView;
+use image::ImageBuffer;
 use log::debug;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
@@ -20,7 +24,47 @@ pub struct Tile {
     id: u64,
 }
 
+#[derive(Debug)]
+pub struct TileConfig {
+    image: DynamicImage,
+    slots: Neighbors<String>,
+}
+
 impl Tile {
+    pub fn from_config(configs: Vec<TileConfig>) -> Vec<Self> {
+        let mut output = Vec::new();
+        let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
+
+        output.reserve_exact(configs.len());
+        slots.reserve_exact(configs.len());
+
+        for config in configs {
+            let tile = Self::new(config.image);
+            slots.push((tile.get_id(), config.slots));
+            output.push(tile);
+        }
+
+        for index in 0..slots.len()  {
+            for (id, neighbors) in slots {
+                for (direction, key) in neighbors {
+                    let inv_dir = match direction {
+                        Direction::Up => Direction::Down,
+                        Direction::Down => Direction::Up,
+                        Direction::Left => Direction::Right,
+                        Direction::Right => Direction::Left,
+                    };
+                    let rev_key: String = slots[index].1[inv_dir].chars().rev().collect();
+
+                    if key == rev_key {
+                        output[index].neighbors[direction].push(id);
+                    }
+                }
+            }
+        }
+
+        output
+    }
+
     pub fn from_image(image: &DynamicImage, grid_size: &Size) -> Vec<Self> {
         let (image_width, image_height) = image.dimensions();
         let tile_width = image_width / grid_size.width as u32;
