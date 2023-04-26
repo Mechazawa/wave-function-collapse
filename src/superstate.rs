@@ -51,7 +51,7 @@ where
         }
     }
 
-    pub fn collapse(&mut self, tick: u32, rng: &mut dyn RngCore) {
+    pub fn collapse(&mut self, rng: &mut dyn RngCore) {
         if self.entropy() > 1 {
             self.possible = vec![self
                 .possible

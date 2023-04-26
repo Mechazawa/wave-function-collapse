@@ -15,12 +15,7 @@ use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 
-use sdl2::render::Canvas;
-use sdl2::video::Window;
-use sdl2::EventPump;
-use sdl2::{event::Event, keyboard::Keycode};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-use sprite::Sprite;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io;
@@ -39,7 +34,20 @@ use tile::Tile;
 
 use crate::grid::Grid;
 use wave::Wave;
-use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
+
+#[cfg(feature = "sdl2")]
+use {
+    superstate::Collapsable,
+    sprite::Sprite,
+    std::collections::HashMap,
+    sdl2::pixels::{PixelFormatEnum, Color},
+    sdl2::rect::Rect,
+    sdl2::render::{Canvas, Texture},
+    sdl2::video::Window,
+    sdl2::EventPump,
+    sdl2::event::Event,
+    sdl2::keyboard::Keycode,
+};
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -72,11 +80,12 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
 struct SdlDraw {
     canvas: Canvas<Window>,
     events: EventPump,
+    pub textures: HashMap<u64, Texture>,
 }
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size) -> Self {
+    pub fn new(size: Size, tiles: &Vec<Tile<Sprite>>) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
@@ -96,10 +105,35 @@ impl SdlDraw {
             .unwrap();
 
         let events = context.event_pump().unwrap();
+        let texture_creator = canvas.texture_creator();
+        let mut textures = HashMap::new();
+
+        for tile in tiles {
+            if textures.contains_key(&tile.get_id()) {
+                continue;
+            }
+
+            let rgba = tile.value.image.to_rgba8();
+            let (width, height) = tile.value.image.dimensions();
+
+            let mut texture = texture_creator
+                .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
+                .map_err(|e| e.to_string())
+                .unwrap();
+
+            texture
+                .with_lock(None, |buffer: &mut [u8], _: usize| {
+                    buffer.copy_from_slice(&rgba);
+                })
+                .unwrap();
+
+            textures.insert(tile.get_id(), texture);
+        }
 
         Self {
             canvas,
             events,
+            textures,
         }
     }
 }
@@ -229,7 +263,8 @@ fn main() {
             .progress_chars("#>-"),
     );
 
-    let mut sdl_draw = if cfg!(feature = "sdl2") && opt.visual {
+    #[cfg(feature = "sdl2")]
+    let mut sdl_draw = if opt.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
         let mut size = opt.output_size;
 
@@ -237,7 +272,7 @@ fn main() {
 
         size.scale(tile_width.try_into().unwrap());
 
-        Some(SdlDraw::new(size))
+        Some(SdlDraw::new(size, &tiles))
     } else {
         None
     };
@@ -245,12 +280,17 @@ fn main() {
     while !wfc.done() {
         progress.set_position(max_progress - wfc.remaining() as u64);
 
+        #[cfg(not(feature = "sdl2"))]
+        wfc.tick();
+        
+        #[cfg(feature = "sdl2")]
         if opt.slow {
             wfc.tick_once();
         } else {
             wfc.tick();
         }
 
+        #[cfg(feature = "sdl2")]
         if let Some(draw) = sdl_draw.as_mut() {
             for event in draw.events.poll_iter() {
                 match event {
@@ -307,33 +347,18 @@ fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
     let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
 
     // context.canvas.clear();
-    let texture_creator = context.canvas.texture_creator();
-
-    // let ttf_context = sdl2::ttf::init().unwrap();
-    // let font = ttf_context.load_font("src/PublicPixel-z84yD.ttf", 8).unwrap();
 
     for (x, y, cell) in &wfc.grid {
-        if let Some(_t) = cell.collapsed() {
+        if let Some(tile) = cell.collapsed() {
             // todo streamline
-            let mut texture = texture_creator
-                .create_texture_streaming(PixelFormatEnum::RGBA32, tile_width, tile_height)
-                .map_err(|e| e.to_string())
-                .unwrap();
-
-            let image_rgba = cell.collapsed().unwrap().value.image.to_rgba8();
-
-            texture
-                .with_lock(None, |buffer: &mut [u8], _: usize| {
-                    buffer.copy_from_slice(&image_rgba);
-                })
-                .unwrap();
+            let texture = context.textures.get(&tile.get_id()).unwrap();
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
                 tile_width,
                 tile_height,
             );
-            context.canvas.copy(&texture, None, Some(rect)).unwrap();
+            context.canvas.copy(texture, None, Some(rect)).unwrap();
         } else {
             let color = if cell.entropy() > 0 {
                 let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;

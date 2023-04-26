@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use log::{trace, warn};
+use log::trace;
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{thread_rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -124,7 +124,7 @@ where
     }
 
     fn collapse(&mut self, x: usize, y: usize) {
-        self.grid.get_mut(x, y).unwrap().collapse(0, &mut self.rng);
+        self.grid.get_mut(x, y).unwrap().collapse(&mut self.rng);
         self.collapsed.push(((x, y), CollapseReason::Explicit));
         self.mark(x, y);
     }
