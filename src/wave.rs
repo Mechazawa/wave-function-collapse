@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
-use rand::seq::SliceRandom;
+use log::trace;
+use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{thread_rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
@@ -52,7 +53,9 @@ where
 
     pub fn tick(&mut self) -> bool {
         if self.stack.is_empty() {
-            if !self.collapse_random() {
+            let success = self.collapse_edge();
+
+            if !success {
                 return false;
             }
         }
@@ -89,7 +92,30 @@ where
         }
     }
 
-    fn collapse_random(&mut self) -> bool {
+    fn collapse(&mut self, x: usize, y: usize) {
+        self.grid.get_mut(x, y).unwrap().collapse(0, &mut self.rng);
+        self.collapsed.push(((x, y), CollapseReason::Explicit));
+        self.mark(x, y);
+    }
+
+    pub fn collapse_any(&mut self) -> bool {
+        let maybe = self
+            .grid
+            .iter()
+            .filter(|(_, _, cell)| cell.entropy() > 1)
+            .map(|(x, y, _)| (x, y))
+            .choose_stable(&mut self.rng);
+
+        match maybe {
+            Some((x, y)) => {
+                self.collapse(x, y);
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn collapse_edge(&mut self) -> bool {
         // get lowest entropy
         let positions: Vec<_> = self
             .grid
@@ -97,33 +123,34 @@ where
             .map(|(x, y, cell)| (x, y, cell.entropy()))
             .collect();
 
-        let lowest = positions.iter().map(|(_, _, e)| e).min().unwrap();
+        let lowest = positions
+            .iter()
+            .map(|(_, _, e)| e)
+            .filter(|&&e| e > 1)
+            .min()
+            .unwrap();
 
         // filter for edge
         let choices: Vec<Position> = positions
             .iter()
             .filter(|(_, _, entropy)| entropy == lowest)
-            .filter(|(x, y, _)| {
+            .map(|&(x, y, _)| (x, y))
+            .filter(|(x, y)| {
                 self.grid
                     .get_neighbors(*x, *y)
                     .values()
                     .find(|&&cell| cell.is_some() && cell.unwrap().entropy() == 1)
                     .is_some()
             })
-            .map(|&(x, y, _)| (x, y))
             .collect();
 
         if choices.len() == 0 {
             false
         } else {
-            // pick
             let &(x, y) = choices.choose(&mut self.rng).unwrap();
 
-            // collapse
-            self.grid.get_mut(x, y).unwrap().collapse(0, &mut self.rng);
-            self.collapsed.push(((x, y), CollapseReason::Explicit));
-            self.mark(x, y);
-            
+            self.collapse(x, y);
+
             true
         }
     }
@@ -187,12 +214,18 @@ where
         let positions: Vec<Position> = self
             .grid
             .iter()
-            .filter(|&(_, _, cell)| cell.entropy() > 1)
+            .filter(|&(_, _, cell)| cell.entropy() > 1 && cell.entropy() < cell.base_entropy())
             .map(|(x, y, _)| (x, y))
             .collect();
 
         for (x, y) in positions {
-            let value = self.grid_base.get(x, y).unwrap().clone();
+            let mut value = self.grid_base.get(x, y).unwrap().clone();
+            let neighbors = self.grid.get_neighbors(x, y).map(|_, n| match n {
+                Some(neighbors) => neighbors.possible.iter().map(|v| v.get_id()).collect(),
+                None => Vec::with_capacity(0),
+            });
+
+            value.tick(0, &neighbors);
 
             self.grid.set(x, y, value).unwrap();
         }

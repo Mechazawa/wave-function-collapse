@@ -39,6 +39,8 @@ use superstate::SuperState;
 use tile::Tile;
 
 use crate::grid::Grid;
+use wave::Wave;
+use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
 use crate::wfc::WaveFuncCollapse;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
@@ -160,6 +162,8 @@ struct Opt {
 
 #[cfg(feature = "image")]
 fn main() {
+    use crate::wave::Wave;
+
     let opt: Opt = Opt::from_args();
 
     if let Some(shell) = opt.completions {
@@ -212,7 +216,9 @@ fn main() {
 
     let max_progress = grid.size() as u64;
     let progress = ProgressBar::new(grid.size() as u64);
-    let mut wfc = WaveFuncCollapse::new(grid, seed);
+    // let mut wfc = WaveFuncCollapse::new(grid, seed);
+    let mut wfc = Wave::new(grid);
+    wfc.collapse_any();
 
     progress.enable_steady_tick(Duration::from_millis(200));
     progress.set_style(
@@ -292,8 +298,7 @@ fn main() {
 
 // todo only draw updated
 #[cfg(feature = "sdl2")]
-fn update_canvas(wfc: &WaveFuncCollapse<Tile<Sprite>>, context: &mut SdlDraw) {
-    use sdl2::{pixels::{PixelFormatEnum, Color}, rect::Rect};
+fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
 
     let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0].value.image.dimensions();
 
@@ -303,9 +308,7 @@ fn update_canvas(wfc: &WaveFuncCollapse<Tile<Sprite>>, context: &mut SdlDraw) {
     // let ttf_context = sdl2::ttf::init().unwrap();
     // let font = ttf_context.load_font("src/PublicPixel-z84yD.ttf", 8).unwrap();
 
-    for &(x, y) in wfc.get_updated() {
-        let cell = wfc.grid.get(x, y).unwrap();
-
+    for (x, y, cell) in &wfc.grid {
         if let Some(_t) = cell.collapsed() {
             // todo streamline
             let mut texture = texture_creator
