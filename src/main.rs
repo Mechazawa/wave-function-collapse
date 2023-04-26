@@ -14,6 +14,8 @@ use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 
+use sdl2::mouse::Cursor;
+use sdl2::video::FullscreenType;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::fmt::Debug;
 use std::fs::File;
@@ -95,6 +97,10 @@ impl SdlDraw {
             .map_err(|e| e.to_string())
             .unwrap();
 
+        if window.fullscreen_state() != FullscreenType::Off {
+            context.mouse().show_cursor(false);
+        }
+
         let mut builder = window.into_canvas().target_texture();
 
         if vsync {
@@ -106,7 +112,7 @@ impl SdlDraw {
         let events = context.event_pump().unwrap();
         let texture_creator = canvas.texture_creator();
         let mut textures = HashMap::new();
-
+        
         for tile in tiles {
             if textures.contains_key(&tile.get_id()) {
                 continue;
