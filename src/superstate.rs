@@ -5,9 +5,9 @@ use std::rc::Rc;
 
 pub trait Collapsable
 {
-    type Key;
-    fn test(&self, neighbors: &Neighbors<Vec<Self::Key>>) -> bool;
-    fn get_id(&self) -> Self::Key;
+    type Identifier;
+    fn test(&self, neighbors: &Neighbors<Vec<Self::Identifier>>) -> bool;
+    fn get_id(&self) -> Self::Identifier;
 }
 
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ where
         }
     }
 
-    pub fn tick(&mut self, tick: u32, neighbors: &Neighbors<Vec<<T as Collapsable>::Key>>) {
+    pub fn tick(&mut self, tick: u32, neighbors: &Neighbors<Vec<T::Identifier>>) {
         let entropy = self.entropy();
 
         if neighbors.len() > 0 && entropy > 1 {
