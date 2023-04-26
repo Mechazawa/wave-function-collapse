@@ -249,7 +249,7 @@ where
         let positions: Vec<Position> = self
             .grid
             .iter()
-            .filter(|&(_, _, cell)| cell.entropy() > 1 && cell.collapsing())
+            .filter(|&(_, _, cell)| cell.entropy() > 1)
             .map(|(x, y, _)| (x, y))
             .collect();
 
