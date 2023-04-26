@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Instant;
 use structopt::StructOpt;
 use structopt_flags::{LogLevel, QuietVerbose};
 
@@ -155,7 +156,9 @@ fn main() {
         // sort the stack; entropy ascending
         stack.sort_by(|a, b| grid[*a].entropy().cmp(&grid[*b].entropy()));
 
-        let mut stack_next = vec![];
+        let mut stack_next = Vec::new();
+
+        stack_next.reserve_exact(stack.len());
 
         for &id in &stack {
             if grid[id].collapsed().is_some() {
@@ -214,7 +217,7 @@ fn main() {
                     (y * tile_height) as i64,
                 );
             } else {
-                let scale = Scale::uniform(6.0);
+                let scale = Scale::uniform(8.0);
                 let color = Rgba([255, 0, 0, 255]); // red
                 let text = format!("{}", grid[index].entropy());
 
