@@ -84,16 +84,24 @@ struct SdlDraw {
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size, tiles: &[Tile<Sprite>], vsync: bool) -> Self {
+    pub fn new(size: Size, tiles: &[Tile<Sprite>], vsync: bool, fullscreen: bool) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
-        let window = video
-            .window("Wave Function Collapse", size.width as u32, size.height as u32)
+        let mut window = video
+            .window(
+                "Wave Function Collapse",
+                size.width as u32,
+                size.height as u32,
+            )
             .position_centered()
             .build()
             .map_err(|e| e.to_string())
             .unwrap();
+
+        if fullscreen {
+            window.set_fullscreen(FullscreenType::True).unwrap();
+        }
 
         if window.fullscreen_state() != FullscreenType::Off {
             context.mouse().show_cursor(false);
@@ -110,7 +118,7 @@ impl SdlDraw {
         let events = context.event_pump().unwrap();
         let texture_creator = canvas.texture_creator();
         let mut textures = HashMap::new();
-        
+
         for tile in tiles {
             if textures.contains_key(&tile.get_id()) {
                 continue;
@@ -203,6 +211,10 @@ struct Opt {
     #[structopt(long, help = "Hold the image for n seconds after finishing")]
     hold: Option<f32>,
 
+    #[cfg(feature = "sdl2")]
+    #[structopt(short, long, help = "Runs the application in full screen")]
+    fullscreen: bool,
+
     #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
     completions: Option<Shell>,
 }
@@ -284,11 +296,7 @@ fn main() {
 
         size.scale(tile_width.try_into().unwrap());
 
-        Some(SdlDraw::new(
-            size,
-            &tiles,
-            opt.vsync,
-        ))
+        Some(SdlDraw::new(size, &tiles, opt.vsync, opt.fullscreen))
     } else {
         None
     };
@@ -333,7 +341,7 @@ fn main() {
     #[cfg(feature = "sdl2")]
     if let Some(delay) = opt.hold {
         info!("Waiting for {} seconds", delay);
-        
+
         std::thread::sleep(Duration::from_secs_f32(delay));
     }
 
