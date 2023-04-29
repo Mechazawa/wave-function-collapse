@@ -1,7 +1,7 @@
 use std::collections::{HashSet, VecDeque};
-use std::hash::{Hasher, BuildHasher};
+use std::hash::{BuildHasher, Hasher};
 
-use log::trace;
+use log::{trace, warn};
 use rand::seq::IteratorRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -37,7 +37,6 @@ impl BuildHasher for NoOpHasher {
 
 type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
 pub type Set<T> = HashSet<T, NoOpHasher>;
-
 
 #[derive(Debug, PartialEq, Eq)]
 enum CollapseReason {
@@ -160,17 +159,17 @@ where
             if entropy <= 1 {
                 continue;
             }
-            
+
             if entropy < lowest {
                 options.clear();
                 lowest = entropy;
             }
-            
+
             if entropy == lowest {
                 options.push((x, y));
             }
         }
-            
+
         let maybe = options.into_iter().choose_stable(&mut self.rng);
 
         match maybe {
@@ -178,9 +177,7 @@ where
                 self.collapse(x, y);
                 Some((x, y))
             }
-            None => {
-                None
-            },
+            None => None,
         }
     }
 
@@ -231,10 +228,25 @@ where
             self.rollback_penalty = 1;
         }
 
-        self.rollback(self.rollback_penalty);
+        let collapsed_count = self
+            .collapsed
+            .iter()
+            .filter(|((_, _), c)| *c == CollapseReason::Explicit)
+            .count();
 
-        if self.collapsed.is_empty() {
+        if collapsed_count < self.rollback_penalty {
+            warn!("Unable to solve, resetting...");
+            for (x, y, cell) in &self.grid_base {
+                self.grid.set(x, y, cell.clone()).unwrap();
+                self.data.set(x, y, None).unwrap();
+            }
+
+            self.collapsed.clear();
+            self.stack.clear();
             self.rollback_penalty = 1;
+            self.last_rollback = 0;
+        } else {
+            self.rollback(self.rollback_penalty);
         }
     }
 
