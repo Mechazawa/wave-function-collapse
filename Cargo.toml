@@ -25,11 +25,6 @@ simplelog = { version = "0.12", features = ["paris"] }
 structopt = "0.3"
 structopt-flags = "0.3"
 
-# for details, see https://github.com/solana-labs/crossbeam/commit/fd279d707025f0e60951e429bf778b4813d1b6bf
-[patch.crates-io.crossbeam-epoch]
-git = "https://github.com/solana-labs/crossbeam" 
-branch = "master"
-
 [features]
 default = ["image", "sdl2", "threaded"]
 image = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]
