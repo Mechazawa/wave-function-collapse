@@ -11,6 +11,7 @@ enum-map = "2.5"
 image = { version = "0.24", optional = true }
 imageproc = { version = "0.23", optional = true }
 indicatif = "0.17"
+lazy_static = { version = "1.4.0", optional = true }
 log = "0.4"
 num-traits = "0.2"
 rand = "0.8"
@@ -28,4 +29,4 @@ structopt-flags = "0.3"
 default = ["image", "sdl2", "threaded"]
 image = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]
 sdl2 = ["image", "dep:sdl2"]
-threaded = ["dep:rayon"]
+threaded = ["dep:rayon", "dep:lazy_static"]

@@ -1454,6 +1454,7 @@ dependencies = [
  "image",
  "imageproc",
  "indicatif",
+ "lazy_static",
  "log",
  "num-traits",
  "rand 0.8.5",

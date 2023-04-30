@@ -48,6 +48,24 @@ use {
     superstate::Collapsable,
 };
 
+#[cfg(feature = "threaded")]
+use {
+    lazy_static::lazy_static,
+};
+
+#[cfg(feature = "threaded")]
+lazy_static! {
+    static ref MIN_LEN: usize = {
+        let workload_size: f32 = 2.8; 
+        let num_threads = rayon::current_num_threads();
+        let min_len = (workload_size * num_threads as f32).ceil() as usize;
+
+        trace!("Min workload size before threading: {min_len}");
+
+        min_len        
+    };
+}
+
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
     let image = ImageReader::open(path)?.decode()?;

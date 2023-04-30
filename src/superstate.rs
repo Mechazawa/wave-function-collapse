@@ -5,7 +5,12 @@ use rand::RngCore;
 use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator, IndexedParallelIterator};
+use {
+    crate::MIN_LEN,
+    rayon::prelude::IntoParallelRefIterator,
+    rayon::prelude::ParallelIterator,
+    rayon::prelude::IndexedParallelIterator,
+};
 
 pub trait Collapsable: Clone + Sync + Send {
     type Identifier: Clone + Eq + Hash + Ord + Sync;
@@ -65,7 +70,7 @@ where
 
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
         if self.possible.len() > 1 {
-            self.possible.sort_by(|a, b| a.get_id().cmp(&b.get_id()));
+            self.possible.sort_by_key(|a| a.get_id());
 
             self.possible = vec![self
                 .possible
@@ -78,25 +83,24 @@ where
     }
 
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
-        if neighbors.len() > 0 && self.entropy() > 1 {
+        if self.entropy() > 1 {
             // self.possible.retain(|v| v.test(neighbors));
+            #[cfg(feature = "threaded")]
+            {
+                self.possible = self
+                    .possible
+                    .par_iter()
+                    .with_min_len(*MIN_LEN)
+                    .filter(|s| s.test(neighbors))
+                    .cloned()
+                    .collect();
+            }
 
             #[cfg(not(feature = "threaded"))]
             {
                 self.possible = self
                     .possible
                     .iter()
-                    .filter(|s| s.test(neighbors))
-                    .cloned()
-                    .collect();
-            }
-            
-            #[cfg(feature = "threaded")]
-            {
-                self.possible = self
-                    .possible
-                    .par_iter()
-                    .with_min_len(50)
                     .filter(|s| s.test(neighbors))
                     .cloned()
                     .collect();
