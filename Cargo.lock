@@ -1605,3 +1605,8 @@ checksum = "10ca8ee3897e213bf74d46641942575fb9b4bd9933cbce0b40eb320836da67e0"
 dependencies = [
  "simd-adler32",
 ]
+
+[[patch.unused]]
+name = "crossbeam-epoch"
+version = "0.9.10"
+source = "git+https://github.com/solana-labs/crossbeam?branch=master#2d9e7e0f81d3dd3efb1975b6379ea8b05fcf9bdd"
