@@ -5,7 +5,7 @@ use rand::RngCore;
 use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator, IndexedParallelIterator};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 pub trait Collapsable: Clone + Sync + Send {
     type Identifier: Clone + Eq + Hash + Ord + Sync;
@@ -78,29 +78,29 @@ where
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
         if neighbors.len() > 0 && self.entropy() > 1 {
             // self.possible.retain(|v| v.test(neighbors));
-
-            #[cfg(not(feature = "threaded"))]
-            {
-                //This is faster than retaining
-                let mut i = 0;
-                while i < self.possible.len() {
-                    if !self.possible[i].test(neighbors) {
-                        self.possible.remove(i);
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
             
             #[cfg(feature = "threaded")]
-            {
+            if self.possible.len() >= 20 {
                 self.possible = self
                     .possible
                     .par_iter()
-                    .with_min_len(20)
                     .filter(|s| s.test(neighbors))
                     .cloned()
                     .collect();
+
+                self.update_entropy();
+                
+                return;
+            }
+
+            //This is faster than retaining
+            let mut i = 0;
+            while i < self.possible.len() {
+                if !self.possible[i].test(neighbors) {
+                    self.possible.remove(i);
+                } else {
+                    i += 1;
+                }
             }
 
             self.update_entropy();
