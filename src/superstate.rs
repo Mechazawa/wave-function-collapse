@@ -65,6 +65,8 @@ where
 
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
         if self.possible.len() > 1 {
+            self.possible.sort_by(|a, b| a.get_id().cmp(&b.get_id()));
+
             self.possible = vec![self
                 .possible
                 .choose_weighted(rng, |v| v.get_weight())
