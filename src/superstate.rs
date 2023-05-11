@@ -84,7 +84,6 @@ where
 
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
         if self.entropy() > 1 {
-            // self.possible.retain(|v| v.test(neighbors));
             #[cfg(feature = "threaded")]
             {
                 self.possible = self

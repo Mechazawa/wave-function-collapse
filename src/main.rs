@@ -197,7 +197,6 @@ struct Opt {
     #[structopt(
         parse(from_os_str),
         help = "Output image",
-        required_unless = "completions"
     )]
     output: Option<PathBuf>,
 
