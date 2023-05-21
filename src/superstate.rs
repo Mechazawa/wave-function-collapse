@@ -1,20 +1,14 @@
-use crate::grid::Neighbors;
-use crate::wave::Set;
+use crate::{grid::Neighbors, wave::NoOpHasher};
+use bit_set::BitSet;
+use bit_vec::BitBlock;
+use num_traits::{NumCast, Num};
 use rand::seq::SliceRandom;
 use rand::RngCore;
-use std::{hash::Hash, sync::Arc};
+use std::{sync::Arc, collections::HashSet, fmt::Debug};
 
-#[cfg(feature = "threaded")]
-use {
-    crate::MIN_LEN,
-    rayon::prelude::IntoParallelRefIterator,
-    rayon::prelude::ParallelIterator,
-    rayon::prelude::IndexedParallelIterator,
-};
-
-pub trait Collapsable: Clone + Sync + Send {
-    type Identifier: Clone + Eq + Hash + Ord + Sync;
-    fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool;
+pub trait Collapsable: Clone + Default {
+    type Identifier: BitBlock;
+    fn test(&self, neighbors: &Neighbors<StateSet<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
     fn get_weight(&self) -> usize;
 }
@@ -82,30 +76,67 @@ where
         }
     }
 
-    pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
+    pub fn tick(&mut self, neighbors: &Neighbors<StateSet<T::Identifier>>) {
         if self.entropy() > 1 {
-            #[cfg(feature = "threaded")]
-            {
-                self.possible = self
-                    .possible
-                    .par_iter()
-                    .with_min_len(*MIN_LEN)
-                    .filter(|s| s.test(neighbors))
-                    .cloned()
-                    .collect();
-            }
-
-            #[cfg(not(feature = "threaded"))]
-            {
-                self.possible = self
-                    .possible
-                    .iter()
-                    .filter(|s| s.test(neighbors))
-                    .cloned()
-                    .collect();
-            }
-
+            self.possible = self
+                .possible
+                .iter()
+                .filter(|s| s.test(neighbors))
+                .cloned()
+                .collect();
+            
             self.update_entropy();
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct StateSet<T: BitBlock> {
+    states: HashSet<T, NoOpHasher>,
+    mask: BitSet<T>,
+}
+
+impl<T: BitBlock> StateSet<T> {
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+
+    pub fn is_disjoint(&self, set: &StateSet<T>) -> bool {
+        self.mask.is_disjoint(set.get_mask_ref())
+    }
+
+    pub fn get_mask_ref(&self) -> &BitSet<T> {
+        &self.mask
+    }
+}
+
+impl<T: BitBlock + NumCast> StateSet<T> {
+    pub fn insert(&mut self, value: T) {
+        self.mask.insert(value.to_usize().unwrap());
+        self.states.insert(value);
+    }
+}
+
+impl<T: BitBlock> IntoIterator for StateSet<T> {
+    type Item = T;
+
+    type IntoIter = <HashSet<T, NoOpHasher> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.states.into_iter()
+    }
+}
+
+impl<T: BitBlock + NumCast> FromIterator<T> for StateSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let states = HashSet::from_iter(iter);
+        let mut mask = BitSet::<T>::default();
+
+        states.iter().for_each(|&x| {mask.insert(x.to_usize().unwrap());});
+
+        Self {
+            mask,
+            states,
         }
     }
 }

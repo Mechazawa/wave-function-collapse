@@ -7,7 +7,7 @@ use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use crate::grid::{Direction, Grid, Neighbors, Position};
-use crate::superstate::{Collapsable, SuperState};
+use crate::superstate::{Collapsable, SuperState, StateSet};
 
 /// https://github.com/chris-morgan/anymap/blob/2e9a5704/src/lib.rs#L599
 #[derive(Debug, Clone, Copy, Default)]
@@ -35,7 +35,7 @@ impl BuildHasher for NoOpHasher {
     }
 }
 
-type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
+type CellNeighbors<T: Collapsable> = Option<Neighbors<StateSet<T>>>;
 pub type Set<T> = HashSet<T, NoOpHasher>;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -51,7 +51,7 @@ where
     pub grid: Grid<SuperState<T>>,
     grid_base: Grid<SuperState<T>>,
     stack: VecDeque<Position>,
-    data: Grid<CellNeighbors<T>>,
+    data: Grid<CellNeighbors<T::Identifier>>,
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
     last_rollback: usize,
@@ -116,8 +116,8 @@ where
 
         if self.data.get(x, y).unwrap().is_none() {
             let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
-                None => Set::default(),
-                Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
+                None => StateSet::default(),
+                Some(neighbor) => StateSet::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
             });
 
             self.data.set(x, y, Some(data)).unwrap();
@@ -182,7 +182,7 @@ where
     }
 
     fn mark(&mut self, cx: usize, cy: usize) {
-        let raw_possible_states: Vec<T::Identifier> = self
+        let raw_possible_states: StateSet<T> = self
             .grid
             .get(cx, cy)
             .unwrap()
@@ -191,7 +191,7 @@ where
             .map(|t| t.get_id())
             .collect();
 
-        let possible_states: Set<T::Identifier> = raw_possible_states.into_iter().collect();
+        let possible_states: StateSet<T> = raw_possible_states.into_iter().collect();
 
         for (direction, pos) in self.data.get_neighbor_positions(cx, cy) {
             if pos.is_none() {
@@ -307,8 +307,8 @@ where
                 let mut base = self.grid_base.get(nx, ny).unwrap().clone();
 
                 let neighbors = self.grid.get_neighbors(nx, ny).map(|_, v| match v {
-                    None => Set::default(),
-                    Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
+                    None => StateSet::default(),
+                    Some(neighbor) => StateSet::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
                 });
 
                 base.tick(&neighbors);

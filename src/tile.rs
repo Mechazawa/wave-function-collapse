@@ -3,6 +3,7 @@ use crate::grid::Grid;
 use crate::grid::Neighbors;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
+use crate::superstate::StateSet;
 use crate::wave::Set;
 
 use enum_map::enum_map;
@@ -26,11 +27,11 @@ mod image_imports {
 #[cfg(feature = "image")]
 use image_imports::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Tile<T> {
     pub value: Box<T>,
     /// todo: neighbours per side
-    pub neighbors: Neighbors<Set<u64>>,
+    pub neighbors: Neighbors<StateSet<u64>>,
 
     id: u64,
     pub weight: usize,
@@ -167,10 +168,10 @@ impl<T> Tile<T> {
     }
 }
 
-impl<T: Clone + Sync + Send> Collapsable for Tile<T> {
+impl<T: Clone+ Default> Collapsable for Tile<T> {
     type Identifier = u64;
 
-    fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool {
+    fn test(&self, neighbors: &Neighbors<StateSet<Self::Identifier>>) -> bool {
         for (direction, tiles) in neighbors {
             if tiles.is_empty() {
                 continue;

@@ -2,7 +2,7 @@ use image::{DynamicImage, GenericImageView, Pixel};
 use std::hash::{Hash, Hasher};
 use num_traits::cast::ToPrimitive;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Sprite {
     /// Todo either figure out other purposes or phase out struct
     pub image: DynamicImage,
