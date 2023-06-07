@@ -14,7 +14,6 @@ use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 
-use sdl2::video::FullscreenType;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::fmt::Debug;
 use std::fs::File;
@@ -36,6 +35,7 @@ use wave::Wave;
 
 #[cfg(feature = "sdl2")]
 use {
+    sdl2::video::FullscreenType,
     sdl2::event::Event,
     sdl2::keyboard::Keycode,
     sdl2::pixels::{Color, PixelFormatEnum},
@@ -47,24 +47,6 @@ use {
     std::collections::HashMap,
     superstate::Collapsable,
 };
-
-#[cfg(feature = "threaded")]
-use {
-    lazy_static::lazy_static,
-};
-
-#[cfg(feature = "threaded")]
-lazy_static! {
-    static ref MIN_LEN: usize = {
-        let workload_size: f32 = 2.8; 
-        let num_threads = rayon::current_num_threads();
-        let min_len = (workload_size * num_threads as f32).ceil() as usize;
-
-        trace!("Min workload size before threading: {min_len}");
-
-        min_len        
-    };
-}
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -197,7 +179,6 @@ struct Opt {
     #[structopt(
         parse(from_os_str),
         help = "Output image",
-        required_unless = "completions"
     )]
     output: Option<PathBuf>,
 

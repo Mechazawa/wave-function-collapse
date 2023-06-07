@@ -6,14 +6,28 @@ use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]
 use {
-    crate::MIN_LEN,
     rayon::prelude::IntoParallelRefIterator,
     rayon::prelude::ParallelIterator,
     rayon::prelude::IndexedParallelIterator,
+    log::trace,
+    lazy_static::lazy_static,
 };
 
+#[cfg(feature = "threaded")]
+lazy_static! {
+    static ref PAR_MIN_LEN: usize = {
+        let workload_size: f32 = 30.0; 
+        let num_threads = rayon::current_num_threads();
+        let min_len = (workload_size * num_threads as f32).ceil() as usize;
+
+        trace!("Min workload size before threading: {min_len}");
+
+        min_len        
+    };
+}
+
 pub trait Collapsable: Clone + Sync + Send {
-    type Identifier: Clone + Eq + Hash + Ord + Sync;
+    type Identifier: Clone + Eq + Hash + Ord + Sync + Send;
     fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool;
     fn get_id(&self) -> Self::Identifier;
     fn get_weight(&self) -> usize;
@@ -90,7 +104,7 @@ where
                 self.possible = self
                     .possible
                     .par_iter()
-                    .with_min_len(*MIN_LEN)
+                    .with_min_len(*PAR_MIN_LEN)
                     .filter(|s| s.test(neighbors))
                     .cloned()
                     .collect();
