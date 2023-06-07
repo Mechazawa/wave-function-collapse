@@ -1,0 +1,51 @@
+name: Build and Store Artifacts
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            arch: aarch64
+            toolchain: stable
+          - target: x86_64-unknown-linux-gnu
+            arch: amd64
+            toolchain: stable
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        sudo apt-get install -y libsdl2-dev:${{ matrix.arch }} libsdl2-image-dev:${{ matrix.arch }}
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          target: ${{ matrix.target }}
+
+    - name: Install cross
+      run: cargo install cross
+
+    - name: Build
+      run: cross build --target ${{ matrix.target }}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.target }}
+        path: target/${{ matrix.target }}/debug/*
