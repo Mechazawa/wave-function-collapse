@@ -1,4 +1,5 @@
 use core::str::FromStr;
+use std::mem;
 use enum_map::{enum_map, Enum, EnumMap};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]
@@ -128,6 +129,16 @@ where
         let index = x + (y * self.width);
 
         self.data.get_mut(index)
+    }
+
+    pub fn replace(&mut self, x: usize, y: usize, value: T) -> Option<T> {
+        let index = x + (y * self.width);
+
+        if index >= self.data.len() {
+            None
+        } else {
+            Some(mem::replace(&mut self.data[index], value))
+        }
     }
 
     pub fn set(&mut self, x: usize, y: usize, value: T) -> Result<(), &'static str> {

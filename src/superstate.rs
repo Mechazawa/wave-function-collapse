@@ -16,7 +16,7 @@ use {
 #[cfg(feature = "threaded")]
 lazy_static! {
     static ref PAR_MIN_LEN: usize = {
-        let workload_size: f32 = 30.0; 
+        let workload_size: f32 = 20.0; /// todo tune
         let num_threads = rayon::current_num_threads();
         let min_len = (workload_size * num_threads as f32).ceil() as usize;
 
@@ -75,9 +75,9 @@ where
         self.entropy = self.possible.len();
     }
 
-    pub fn collapsed(&self) -> Option<Arc<T>> {
+    pub fn collapsed(&self) -> Option<Arc<&T>> {
         match self.possible.len() {
-            1 => Some(self.possible.get(0)?.clone()),
+            1 => Some(Arc::new(self.possible.get(0)?.as_ref())),
             _ => None,
         }
     }
@@ -86,11 +86,17 @@ where
         if self.possible.len() > 1 {
             self.possible.sort_by_key(|a| a.get_id());
 
-            self.possible = vec![self
+            let chosen_id = self
                 .possible
                 .choose_weighted(rng, |v| v.get_weight())
                 .unwrap()
-                .clone()];
+                .get_id();
+
+            let chosen_index = self.possible.iter().position(|v| v.get_id() == chosen_id);
+
+            if let Some(pos) = chosen_index {
+                self.possible = vec![self.possible.swap_remove(pos)];
+            }
 
             self.update_entropy();
         }
@@ -100,23 +106,20 @@ where
         if self.entropy() > 1 {
             #[cfg(feature = "threaded")]
             {
-                self.possible = self
+                let ids: Vec<T::Identifier> = self
                     .possible
                     .par_iter()
                     .with_min_len(*PAR_MIN_LEN)
                     .filter(|s| s.test(neighbors))
-                    .cloned()
+                    .map(|s| s.get_id())
                     .collect();
+
+                self.possible.retain(|s| ids.contains(&s.get_id()))
             }
 
             #[cfg(not(feature = "threaded"))]
             {
-                self.possible = self
-                    .possible
-                    .iter()
-                    .filter(|s| s.test(neighbors))
-                    .cloned()
-                    .collect();
+                self.possible.retain(|s| s.test(neighbors));
             }
 
             self.update_entropy();

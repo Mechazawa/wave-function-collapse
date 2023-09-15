@@ -1,5 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
+use std::cmp::{min, max};
 
 use log::{trace, warn};
 use rand::seq::IteratorRandom;
@@ -125,7 +126,7 @@ where
 
         let cell = self.grid.get_mut(x, y).unwrap();
 
-        let neighbors = self.data.get(x, y).unwrap().clone().unwrap();
+        let neighbors = self.data.replace(x, y, None).unwrap().unwrap();
 
         self.data.set(x, y, None).unwrap();
         let old_entropy = cell.entropy();
