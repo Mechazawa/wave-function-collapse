@@ -269,7 +269,13 @@ fn main() {
         opt.output_size.height,
         &mut |_, _| base_state.clone(),
     );
-    let seed = opt.seed.unwrap_or(OsRng.gen());
+    let seed = {
+        #[cfg(not(feature = "threaded"))]
+        {opt.seed.unwrap_or(OsRng.gen())}
+
+        #[cfg(feature = "threaded")]
+        {OsRng.gen()}
+    };
 
     info!("Using seed: {}", seed);
 
