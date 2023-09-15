@@ -8,7 +8,6 @@ use std::{hash::Hash, sync::Arc};
 use {
     rayon::prelude::IntoParallelRefIterator,
     rayon::prelude::ParallelIterator,
-    rayon::prelude::IndexedParallelIterator,
     log::trace,
     lazy_static::lazy_static,
 };
