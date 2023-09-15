@@ -16,7 +16,7 @@ use {
 #[cfg(feature = "threaded")]
 lazy_static! {
     static ref PAR_MIN_LEN: usize = {
-        let workload_size: f32 = 20.0; /// todo tune
+        let workload_size: f32 = 20.0; // todo tune
         let num_threads = rayon::current_num_threads();
         let min_len = (workload_size * num_threads as f32).ceil() as usize;
 

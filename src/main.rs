@@ -191,7 +191,8 @@ struct Opt {
     )]
     output_size: Size,
 
-    #[structopt(parse(try_from_str), short, long, help = "Random seed (unstable)")]
+    #[cfg(not(feature = "threaded"))]
+    #[structopt(parse(try_from_str), short, long, help = "Random seed")]
     seed: Option<u64>,
 
     #[cfg(feature = "sdl2")]
