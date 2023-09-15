@@ -1,6 +1,5 @@
 use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
-use std::cmp::{min, max};
 
 use log::{trace, warn};
 use rand::seq::IteratorRandom;
