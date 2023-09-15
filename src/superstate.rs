@@ -105,22 +105,19 @@ where
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
         if self.entropy() > 1 {
             #[cfg(feature = "threaded")]
-            {
-                let ids: Vec<T::Identifier> = self
+            if self.possible.len() > *PAR_MIN_LEN {
+                self.possible = self
                     .possible
                     .par_iter()
-                    .with_min_len(*PAR_MIN_LEN)
                     .filter(|s| s.test(neighbors))
-                    .map(|s| s.get_id())
+                    .cloned()
                     .collect();
-
-                self.possible.retain(|s| ids.contains(&s.get_id()))
+            } else {
+                self.possible.retain(|s| s.test(neighbors));
             }
 
             #[cfg(not(feature = "threaded"))]
-            {
-                self.possible.retain(|s| s.test(neighbors));
-            }
+            self.possible.retain(|s| s.test(neighbors));
 
             self.update_entropy();
         }
