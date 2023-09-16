@@ -151,7 +151,8 @@ where
 
     pub fn maybe_collapse(&mut self) -> Option<Position> {
         let mut options = Vec::new();
-        let mut lowest = usize::MAX;
+        let mut lowest_entropy = usize::MAX;
+        let mut most_neighbors = 0;
 
         for (x, y, cell) in &self.grid {
             let entropy = cell.entropy();
@@ -160,17 +161,36 @@ where
                 continue;
             }
 
-            if entropy < lowest {
+            if entropy < lowest_entropy {
                 options.clear();
-                lowest = entropy;
+                lowest_entropy = entropy;
+                most_neighbors = 0;
             }
 
-            if entropy == lowest {
-                options.push((x, y));
+            if entropy == lowest_entropy {
+                let neighbors = self.grid.get_neighbors(x, y);
+                let collapsed_neighbor_count = neighbors
+                    .values()
+                    .filter_map(|v| v.as_ref())
+                    .filter(|v| !v.collapsing())
+                    .count();
+
+                most_neighbors = most_neighbors.max(collapsed_neighbor_count);
+
+                options.push((x, y, collapsed_neighbor_count));
             }
         }
 
-        let maybe = options.into_iter().choose_stable(&mut self.rng);
+        let maybe = options
+            .into_iter()
+            .filter_map(|(x, y, c)| {
+                if c == most_neighbors {
+                    Some((x, y))
+                } else {
+                    None
+                }
+            })
+            .choose_stable(&mut self.rng);
 
         match maybe {
             Some((x, y)) => {
