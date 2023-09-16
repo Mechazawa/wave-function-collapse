@@ -385,28 +385,34 @@ fn main() {
 // todo only draw updated
 #[cfg(feature = "sdl2")]
 fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
+    use sdl2::render::BlendMode;
+
     let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
         .value
         .image
         .dimensions();
 
     context.canvas.clear();
+    context.canvas.set_blend_mode(BlendMode::Blend);
 
     for (x, y, cell) in &wfc.grid {
+
+        let rect = Rect::new(
+            x as i32 * tile_width as i32,
+            y as i32 * tile_height as i32,
+            tile_width,
+            tile_height,
+        );
+
         if let Some(tile) = cell.collapsed() {
             // todo streamline
             let texture = context.textures.get(&tile.get_id()).unwrap();
-            let rect = Rect::new(
-                x as i32 * tile_width as i32,
-                y as i32 * tile_height as i32,
-                tile_width,
-                tile_height,
-            );
+
             context.canvas.set_draw_color(Color::GRAY);
             context.canvas.fill_rect(rect).unwrap();
             context.canvas.copy(texture, None, Some(rect)).unwrap();
         } else {
-            let color = if cell.entropy() > 0 {
+            let mut color = if cell.entropy() > 0 {
                 let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
                 let value = (255.0 * (1.0 - ratio)) as u8;
 
@@ -415,12 +421,10 @@ fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
                 Color::RED
             };
 
-            let rect = Rect::new(
-                x as i32 * tile_width as i32,
-                y as i32 * tile_height as i32,
-                tile_width,
-                tile_height,
-            );
+
+            if wfc.data.get(x, y).map(|x| x.is_some()).unwrap_or(false) {
+                color.r = 40;
+            }
 
             context.canvas.set_draw_color(color);
             context.canvas.fill_rect(rect).unwrap();

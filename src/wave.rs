@@ -1,7 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 
-use log::{trace, warn};
+use log::{trace, warn, debug};
 use rand::seq::IteratorRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -51,7 +51,8 @@ where
     pub grid: Grid<SuperState<T>>,
     grid_base: Grid<SuperState<T>>,
     stack: VecDeque<Position>,
-    data: Grid<CellNeighbors<T>>,
+    // todo tmp pub
+    pub data: Grid<CellNeighbors<T>>,
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
     last_rollback: usize,
@@ -139,7 +140,11 @@ where
         if cell.entropy() == 0 {
             self.smart_rollback();
         } else if old_entropy != cell.entropy() {
-            self.mark(x, y);
+            if cell.collapsing() && self.grid.get_neighbors(x, y).values().all(|v| v.map(|v| !v.collapsing()).unwrap_or(true)) {
+                self.collapse(x, y);    
+            } else {
+                self.mark(x, y);
+            }
         }
     }
 
