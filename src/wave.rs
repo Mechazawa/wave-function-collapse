@@ -1,7 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 
-use log::{trace, warn, debug};
+use log::{debug, trace, warn};
 use rand::seq::IteratorRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -86,15 +86,44 @@ where
 
     #[allow(dead_code)]
     pub fn tick(&mut self) -> bool {
-        if self.stack.is_empty() && self.maybe_collapse().is_none() {
-            return false;
+        // if self.stack.is_empty() && self.maybe_collapse().is_none() {
+        //     return false;
+        // }
+
+ 
+        let mut worked = false;
+        // let chunk_size = (self.grid.width() / 16).min(self.grid.height() / 16).min(1);
+        let chunk_size = 20;
+
+        for sx in (0..self.grid.width()).step_by(chunk_size) {
+            for sy in (0..self.grid.height()).step_by(chunk_size) {
+                self.stack.push_back((0, 0));
+                while !self.stack.is_empty() {
+                    self.stack.clear();
+                    //todo: just loop over stack and move stuff that isn't local to temporary stack
+                    // todo: broken \/
+                    for x in sx..((sx + chunk_size).min(self.grid.width())) {
+                        for y in sy..((sy + chunk_size).min(self.grid.height())) {
+                            if self.stack.contains(&(x, y)) {
+                                self.tick_cell(x, y);
+
+                                worked = worked || !self.stack.is_empty();
+                            }                            
+                        }
+                    }
+                }
+            }
+        }
+
+        for (x, y, _) in self.data.iter().filter(|(_,_,v)| v.is_some()) {
+            self.stack.push_back((x, y));
         }
 
         while let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);
         }
 
-        true
+        worked || self.maybe_collapse().is_none()
     }
 
     #[allow(dead_code)]
@@ -140,8 +169,14 @@ where
         if cell.entropy() == 0 {
             self.smart_rollback();
         } else if old_entropy != cell.entropy() {
-            if cell.collapsing() && self.grid.get_neighbors(x, y).values().all(|v| v.map(|v| !v.collapsing()).unwrap_or(true)) {
-                self.collapse(x, y);    
+            if cell.collapsing()
+                && self
+                    .grid
+                    .get_neighbors(x, y)
+                    .values()
+                    .all(|v| v.map(|v| !v.collapsing()).unwrap_or(true))
+            {
+                self.collapse(x, y);
             } else {
                 self.mark(x, y);
             }

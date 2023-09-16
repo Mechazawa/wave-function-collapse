@@ -222,6 +222,26 @@ where
     pub fn height(&self) -> usize {
         self.height
     }
+
+    pub fn slice(&self, x: usize, y: usize, width: usize, height: usize) -> Grid<&T> {
+        Grid::new(
+            width.min(self.width() - x), 
+            height.min(self.height() - y), 
+            &mut |x, y| self.get(x, y).unwrap()
+        )
+    }
+
+    pub fn chunked(&self, chunk_width: usize, chunk_height: usize) -> Vec<Grid<&T>> {
+        let mut output = vec![];
+
+        for x in (0..self.width()).step_by(chunk_width) {
+            for y in (0..self.height()).step_by(chunk_height) {
+                output.push(self.slice(x, y, chunk_width, chunk_height));
+            }
+        }
+
+        return output;
+    }
 }
 
 impl<'a, T> IntoIterator for &'a Grid<T>
