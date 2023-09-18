@@ -1,7 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 
-use log::{debug, trace, warn};
+use log::{trace, warn};
 use rand::seq::IteratorRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -56,7 +56,8 @@ where
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
     last_rollback: usize,
-    rollback_penalty: usize,
+    rollback_penalty: f64,
+    // tracker: PropegationTracker,
 }
 
 impl<T> Wave<T>
@@ -72,7 +73,8 @@ where
             grid,
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
             last_rollback: 0,
-            rollback_penalty: 0,
+            rollback_penalty: 0.0,
+            // tracker: Default::default(),
         }
     }
 
@@ -86,41 +88,11 @@ where
 
     #[allow(dead_code)]
     pub fn tick(&mut self) -> bool {
-        // if self.stack.is_empty() && self.maybe_collapse().is_none() {
-        //     return false;
-        // }
-
- 
         let mut worked = false;
-        // let chunk_size = (self.grid.width() / 16).min(self.grid.height() / 16).min(1);
-        let chunk_size = 20;
-
-        for sx in (0..self.grid.width()).step_by(chunk_size) {
-            for sy in (0..self.grid.height()).step_by(chunk_size) {
-                self.stack.push_back((0, 0));
-                while !self.stack.is_empty() {
-                    self.stack.clear();
-                    //todo: just loop over stack and move stuff that isn't local to temporary stack
-                    // todo: broken \/
-                    for x in sx..((sx + chunk_size).min(self.grid.width())) {
-                        for y in sy..((sy + chunk_size).min(self.grid.height())) {
-                            if self.stack.contains(&(x, y)) {
-                                self.tick_cell(x, y);
-
-                                worked = worked || !self.stack.is_empty();
-                            }                            
-                        }
-                    }
-                }
-            }
-        }
-
-        for (x, y, _) in self.data.iter().filter(|(_,_,v)| v.is_some()) {
-            self.stack.push_back((x, y));
-        }
 
         while let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);
+            worked = true;
         }
 
         worked || self.maybe_collapse().is_none()
@@ -186,15 +158,18 @@ where
     fn collapse(&mut self, x: usize, y: usize) {
         self.grid.get_mut(x, y).unwrap().collapse(&mut self.rng);
         self.collapsed.push(((x, y), CollapseReason::Explicit));
+        // self.tracker.next(x, y);
         self.mark(x, y);
     }
 
     pub fn maybe_collapse(&mut self) -> Option<Position> {
         let mut options = Vec::new();
         let mut lowest_entropy = usize::MAX;
-        let mut most_neighbors = 0;
+        let areas = self.collapsable_areas();
 
-        for (x, y, cell) in &self.grid {
+        for &(x, y) in areas.first().unwrap() {
+            let cell = self.grid.get(x, y).unwrap();
+            // for (x, y, cell) in &self.grid {
             let entropy = cell.entropy();
 
             if entropy <= 1 {
@@ -204,33 +179,14 @@ where
             if entropy < lowest_entropy {
                 options.clear();
                 lowest_entropy = entropy;
-                most_neighbors = 0;
             }
 
             if entropy == lowest_entropy {
-                let neighbors = self.grid.get_neighbors(x, y);
-                let collapsed_neighbor_count = neighbors
-                    .values()
-                    .filter_map(|v| v.as_ref())
-                    .filter(|v| !v.collapsing())
-                    .count();
-
-                most_neighbors = most_neighbors.max(collapsed_neighbor_count);
-
-                options.push((x, y, collapsed_neighbor_count));
+                options.push((x, y));
             }
         }
 
-        let maybe = options
-            .into_iter()
-            .filter_map(|(x, y, c)| {
-                if c == most_neighbors {
-                    Some((x, y))
-                } else {
-                    None
-                }
-            })
-            .choose_stable(&mut self.rng);
+        let maybe = options.into_iter().choose_stable(&mut self.rng);
 
         match maybe {
             Some((x, y)) => {
@@ -282,10 +238,10 @@ where
         trace!("Collapsed: {}", collapsed_count);
 
         if collapsed_count <= self.last_rollback {
-            self.rollback_penalty += 1;
+            self.rollback_penalty += 0.5;
         } else {
             self.last_rollback = collapsed_count;
-            self.rollback_penalty = 1;
+            self.rollback_penalty = 0.5;
         }
 
         let collapsed_count = self
@@ -294,7 +250,7 @@ where
             .filter(|((_, _), c)| *c == CollapseReason::Explicit)
             .count();
 
-        if collapsed_count < self.rollback_penalty {
+        if collapsed_count < self.rollback_penalty.ceil() as usize {
             warn!("Unable to solve, resetting...");
             for (x, y, cell) in &self.grid_base {
                 self.grid.set(x, y, cell.clone()).unwrap();
@@ -303,10 +259,17 @@ where
 
             self.collapsed.clear();
             self.stack.clear();
-            self.rollback_penalty = 1;
+            self.rollback_penalty = 0.5;
             self.last_rollback = 0;
         } else {
-            self.rollback(self.rollback_penalty);
+            self.rollback(self.rollback_penalty.ceil() as usize);
+
+            // tmp hack, shouldn't have to do this...
+            self.stack.clear();
+            for (x, y, _) in &self.grid {
+                self.data.set(x, y, None).unwrap();
+                self.stack.push_back((x, y));
+            }
         }
     }
 
@@ -318,7 +281,7 @@ where
         }
 
         // empty stack
-        self.stack.clear();
+        // self.stack.clear();
         self.data = Grid::new(self.grid.width(), self.grid.height(), &mut |_, _| {
             Default::default()
         });
@@ -331,6 +294,7 @@ where
 
             if reason == CollapseReason::Explicit {
                 count -= 1;
+                // self.tracker.back();
 
                 if count == 0 {
                     break;
@@ -381,5 +345,51 @@ where
                 }
             }
         }
+    }
+
+    fn collapsable_areas(&self) -> Vec<Vec<Position>> {
+        let mut board = Grid::<bool>::new(self.grid.width(), self.grid.height(), &mut |x, y| {
+            let item = self.grid.get(x, y).unwrap();
+
+            item.entropy() == 1
+            // item.entropy() == 1 || self.tracker.seen(x, y)
+        });
+
+        let mut stack: Vec<Position> = Default::default();
+        let mut output: Vec<Vec<Position>> = Default::default();
+
+        for bx in 0..board.width() {
+            for by in 0..board.height() {
+                if *board.get(bx, by).unwrap_or(&true) {
+                    continue;
+                }
+
+                stack.push((bx, by));
+
+                let mut area: Vec<Position> = Vec::new();
+
+                while let Some((x, y)) = stack.pop() {
+                    if *board.get(x, y).unwrap_or(&true) {
+                        continue;
+                    }
+
+                    board.set(x, y, true).unwrap();
+
+                    board
+                        .get_neighbor_positions(x, y)
+                        .values()
+                        .filter_map(|v| *v)
+                        .for_each(|v| stack.push(v));
+
+                    area.push((x, y));
+                }
+
+                output.push(area);
+            }
+        }
+
+        output.sort_by(|a, b| a.len().cmp(&b.len()));
+
+        output
     }
 }
