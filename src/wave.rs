@@ -86,7 +86,6 @@ where
         self.grid.size() - self.collapsed.len()
     }
 
-    #[allow(dead_code)]
     pub fn tick(&mut self) -> bool {
         let mut worked = false;
 
@@ -98,7 +97,6 @@ where
         worked || self.maybe_collapse().is_none()
     }
 
-    #[allow(dead_code)]
     pub fn tick_once(&mut self) -> Option<Position> {
         if let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);

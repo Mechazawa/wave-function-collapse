@@ -30,3 +30,6 @@ default = ["image", "sdl2"]
 image = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]
 sdl2 = ["image", "dep:sdl2"]
 threaded = ["dep:rayon", "dep:lazy_static"]
+
+[profile.release]
+lto = "fat"
