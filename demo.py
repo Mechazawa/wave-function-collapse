@@ -7,6 +7,9 @@ from dataclasses import dataclass
 import subprocess
 from math import ceil
 
+# base_command = ['cargo', 'run', '--release']
+base_command = ['./target/release/wave-function-collapse']
+
 @dataclass
 class Command:
     image_name: str
@@ -17,7 +20,7 @@ class Command:
         s = "{}x{}".format(ceil(width / self.size), ceil(height / self.size))
 
         out = [
-            'cargo', 'run', '--release', 
+            *base_command, 
             '--', 
             '-Vvv', 
             '-i', str(self.size),
