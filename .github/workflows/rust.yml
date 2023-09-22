@@ -16,17 +16,20 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             arch: arm64
             toolchain: stable
-          - target: x86_64-unknown-linux-gnu
-            arch: amd64
-            toolchain: stable
+          # - target: x86_64-unknown-linux-gnu
+          #   arch: amd64
+          #   toolchain: stable
 
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install dependencies
+    - name: Set architecture
       run: |
         sudo dpkg --add-architecture ${{ matrix.arch }}
         sudo apt-get update
+
+    - name: Install dependencies
+      run: |
         sudo apt-get install -y libsdl2-dev:${{ matrix.arch }} libsdl2-image-dev:${{ matrix.arch }}
 
     - name: Install Rust
