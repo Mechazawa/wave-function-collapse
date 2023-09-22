@@ -204,6 +204,10 @@ struct Opt {
     slow: bool,
 
     #[cfg(feature = "sdl2")]
+    #[structopt(long, help = "Show debug info during visualisation")]
+    debug: bool,
+
+    #[cfg(feature = "sdl2")]
     #[structopt(long, help = "Turns on vsync")]
     vsync: bool,
 
@@ -323,7 +327,7 @@ fn main() {
                 }
             }
 
-            update_canvas(&wfc, draw);
+            update_canvas(&wfc, draw, opt.debug);
         }
 
         #[cfg(feature = "sdl2")]
@@ -339,7 +343,7 @@ fn main() {
 
     #[cfg(feature = "sdl2")]
     if let Some(draw) = sdl_draw.as_mut() {
-        update_canvas(&wfc, draw);
+        update_canvas(&wfc, draw, opt.debug);
     }
 
     progress.finish();
@@ -384,7 +388,7 @@ fn main() {
 
 // todo only draw updated
 #[cfg(feature = "sdl2")]
-fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
+fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw, show_debug: bool) {
     use sdl2::render::BlendMode;
 
     let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
@@ -418,12 +422,12 @@ fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw) {
 
                 Color::RGB(0, value / 3, value / 2)
             } else {
-                Color::RED
+                Color::BLACK
             };
 
 
-            if wfc.data.get(x, y).map(|x| x.is_some()).unwrap_or(false) {
-                color.r = 40;
+            if show_debug && wfc.data.get(x, y).map(|x| x.is_some()).unwrap_or(false) {
+                color.r = 80;
             }
 
             context.canvas.set_draw_color(color);
