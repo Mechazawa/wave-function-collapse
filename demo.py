@@ -32,6 +32,11 @@ class Command:
 
 commands = [
     Command("images/circuit-1-57x30.png", 14),
+    Command("images/safari.png", 16),
+    Command("images/sea_town.png", 16),
+    # Command("images/farm.png", 16),
+    Command("images/yoshi.png", 16),
+    Command("images/desert.png", 16),
 ]
 
 def main():
