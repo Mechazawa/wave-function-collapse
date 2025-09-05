@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Wave Function Collapse - WASM Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .controls {
+            flex: 0 0 300px;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .canvas-area {
+            flex: 1;
+            min-width: 400px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        canvas {
+            border: 2px solid #333;
+            display: block;
+            margin: 20px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007cba;
+            transition: width 0.3s ease;
+        }
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.success { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <h1>Wave Function Collapse - WASM Demo</h1>
+    <p>Generate images using the Wave Function Collapse algorithm in your browser!</p>
+    
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="imageInput">Input Image:</label>
+                <input type="file" id="imageInput" accept="image/*">
+                <canvas id="inputPreview" class="image-preview hidden"></canvas>
+            </div>
+            
+            <div class="control-group">
+                <label for="tileSizeInput">Tile Size:</label>
+                <input type="number" id="tileSizeInput" value="3" min="2" max="20">
+                <small>Size of tiles to extract from input image</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="outputWidthInput">Output Width (tiles):</label>
+                <input type="number" id="outputWidthInput" value="30" min="5" max="100">
+            </div>
+            
+            <div class="control-group">
+                <label for="outputHeightInput">Output Height (tiles):</label>
+                <input type="number" id="outputHeightInput" value="20" min="5" max="100">
+            </div>
+            
+            <div class="control-group">
+                <label for="seedInput">Seed (optional):</label>
+                <input type="number" id="seedInput" placeholder="Random if empty">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showDebug"> Show Debug Info
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <button id="generateBtn">Generate Image</button>
+                <button id="stepBtn" disabled>Step Once</button>
+                <button id="pauseBtn" disabled>Pause/Resume</button>
+                <button id="downloadBtn" class="hidden">Download Result</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Progress:</label>
+                <div class="progress">
+                    <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                </div>
+                <div id="progressText">0%</div>
+            </div>
+            
+            <div id="status" class="status info">
+                Select an input image to begin. Try the sample images in the images/ folder!
+            </div>
+        </div>
+        
+        <div class="canvas-area">
+            <h3>Generated Output:</h3>
+            <canvas id="wfc-canvas" width="600" height="400"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { WfcGenerator } from './pkg/wave_function_collapse.js';
+        
+        let wfc = null;
+        let isGenerating = false;
+        let isPaused = false;
+        let animationId = null;
+
+        const elements = {
+            imageInput: document.getElementById('imageInput'),
+            inputPreview: document.getElementById('inputPreview'),
+            tileSizeInput: document.getElementById('tileSizeInput'),
+            outputWidthInput: document.getElementById('outputWidthInput'),
+            outputHeightInput: document.getElementById('outputHeightInput'),
+            seedInput: document.getElementById('seedInput'),
+            showDebug: document.getElementById('showDebug'),
+            generateBtn: document.getElementById('generateBtn'),
+            stepBtn: document.getElementById('stepBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            downloadBtn: document.getElementById('downloadBtn'),
+            progressBar: document.getElementById('progressBar'),
+            progressText: document.getElementById('progressText'),
+            status: document.getElementById('status'),
+            canvas: document.getElementById('wfc-canvas')
+        };
+
+        function setStatus(message, type = 'info') {
+            elements.status.textContent = message;
+            elements.status.className = `status ${type}`;
+        }
+
+        function updateProgress(progress) {
+            const percent = Math.round(progress * 100);
+            elements.progressBar.style.width = percent + '%';
+            elements.progressText.textContent = percent + '%';
+        }
+
+        function setControlsEnabled(enabled) {
+            elements.generateBtn.disabled = !enabled;
+            elements.stepBtn.disabled = !enabled || !wfc;
+            elements.pauseBtn.disabled = !enabled || !wfc;
+        }
+
+        elements.imageInput.addEventListener('change', handleImageUpload);
+        elements.generateBtn.addEventListener('click', startGeneration);
+        elements.stepBtn.addEventListener('click', stepOnce);
+        elements.pauseBtn.addEventListener('click', togglePause);
+        elements.downloadBtn.addEventListener('click', downloadResult);
+
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const img = new Image();
+                img.onload = () => {
+                    elements.inputPreview.width = img.width;
+                    elements.inputPreview.height = img.height;
+                    const ctx = elements.inputPreview.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    elements.inputPreview.classList.remove('hidden');
+                    setStatus(`Input image loaded: ${img.width}×${img.height}px`, 'success');
+                };
+                img.src = URL.createObjectURL(file);
+            } catch (error) {
+                setStatus('Failed to load image: ' + error.message, 'error');
+            }
+        }
+
+        async function startGeneration() {
+            if (!elements.inputPreview.getContext) {
+                setStatus('Please select an input image first', 'error');
+                return;
+            }
+
+            try {
+                setControlsEnabled(false);
+                isGenerating = true;
+                isPaused = false;
+                
+                const inputCanvas = elements.inputPreview;
+                const ctx = inputCanvas.getContext('2d');
+                const imageData = ctx.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
+                
+                const tileSize = parseInt(elements.tileSizeInput.value);
+                const outputWidth = parseInt(elements.outputWidthInput.value);
+                const outputHeight = parseInt(elements.outputHeightInput.value);
+                const seed = elements.seedInput.value ? parseInt(elements.seedInput.value) : undefined;
+                
+                setStatus('Initializing WFC generator...', 'info');
+                
+                wfc = new WfcGenerator(imageData, tileSize, outputWidth, outputHeight, seed);
+                
+                const canvasWidth = outputWidth * tileSize * 10; // Scale up for visibility
+                const canvasHeight = outputHeight * tileSize * 10;
+                elements.canvas.width = Math.min(canvasWidth, 800);
+                elements.canvas.height = Math.min(canvasHeight, 600);
+                
+                wfc.init_renderer(outputWidth, outputHeight);
+                
+                setStatus('Generation started...', 'info');
+                animate();
+                
+            } catch (error) {
+                setStatus('Generation failed: ' + error.message, 'error');
+                setControlsEnabled(true);
+                isGenerating = false;
+            }
+        }
+
+        function animate() {
+            if (!isGenerating || isPaused) return;
+            
+            try {
+                // Step multiple times per frame for faster generation
+                const stepsPerFrame = 5;
+                for (let i = 0; i < stepsPerFrame && !wfc.is_done(); i++) {
+                    wfc.step();
+                }
+                
+                wfc.render(elements.showDebug.checked);
+                updateProgress(wfc.get_progress());
+                
+                if (wfc.is_done()) {
+                    setStatus('Generation complete!', 'success');
+                    setControlsEnabled(true);
+                    elements.downloadBtn.classList.remove('hidden');
+                    isGenerating = false;
+                } else {
+                    animationId = requestAnimationFrame(animate);
+                }
+                
+            } catch (error) {
+                setStatus('Generation error: ' + error.message, 'error');
+                setControlsEnabled(true);
+                isGenerating = false;
+            }
+        }
+
+        function stepOnce() {
+            if (!wfc) return;
+            
+            try {
+                if (!wfc.is_done()) {
+                    wfc.step();
+                    wfc.render(elements.showDebug.checked);
+                    updateProgress(wfc.get_progress());
+                    
+                    if (wfc.is_done()) {
+                        setStatus('Generation complete!', 'success');
+                        elements.downloadBtn.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                setStatus('Step error: ' + error.message, 'error');
+            }
+        }
+
+        function togglePause() {
+            if (!wfc) return;
+            
+            isPaused = !isPaused;
+            elements.pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+            
+            if (!isPaused && isGenerating) {
+                animate();
+            }
+        }
+
+        async function downloadResult() {
+            if (!wfc || !wfc.is_done()) return;
+            
+            try {
+                const outputImageData = wfc.get_output_image_data();
+                const canvas = document.createElement('canvas');
+                canvas.width = outputImageData.width;
+                canvas.height = outputImageData.height;
+                const ctx = canvas.getContext('2d');
+                ctx.putImageData(outputImageData, 0, 0);
+                
+                const link = document.createElement('a');
+                link.download = 'wfc-output.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            } catch (error) {
+                setStatus('Download failed: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize WASM
+        init().then(() => {
+            setStatus('WASM module loaded. Select an input image to begin!', 'success');
+        }).catch(error => {
+            setStatus('Failed to load WASM module: ' + error.message, 'error');
+        });
+    </script>
+</body>
+</html>

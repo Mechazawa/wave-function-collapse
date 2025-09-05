@@ -1,4 +1,5 @@
 mod grid;
+mod renderer;
 mod sprite;
 mod superstate;
 mod tile;
@@ -7,22 +8,32 @@ mod wave;
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
 use image::{ImageError, RgbaImage};
 
+#[cfg(feature = "cli")]
 use indicatif::ProgressBar;
+#[cfg(feature = "cli")]
 use indicatif::ProgressStyle;
 use log::warn;
 use log::{info, trace};
 use rand::rngs::OsRng;
 use rand::Rng;
 
+#[cfg(feature = "cli")]
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::fmt::Debug;
+#[cfg(feature = "cli")]
 use std::fs::File;
+#[cfg(feature = "cli")]
 use std::io::BufReader;
+#[cfg(feature = "cli")]
 use std::path::PathBuf;
 use std::time::Duration;
+#[cfg(feature = "cli")]
 use std::{io, usize};
+#[cfg(feature = "cli")]
 use structopt::clap::Shell;
+#[cfg(feature = "cli")]
 use structopt::StructOpt;
+#[cfg(feature = "cli")]
 use structopt_flags::{LogLevel, QuietVerbose};
 use tile::TileConfig;
 
@@ -34,20 +45,11 @@ use crate::grid::Grid;
 use wave::Wave;
 
 #[cfg(feature = "sdl2")]
-use {
-    sdl2::video::FullscreenType,
-    sdl2::event::Event,
-    sdl2::keyboard::Keycode,
-    sdl2::pixels::{Color, PixelFormatEnum},
-    sdl2::rect::Rect,
-    sdl2::render::{Canvas, Texture},
-    sdl2::video::Window,
-    sdl2::EventPump,
-    sprite::Sprite,
-    std::collections::HashMap,
-    superstate::Collapsable,
-};
+use renderer::{Renderer, RendererConfig, SdlRenderer};
+#[cfg(feature = "sdl2")]
+use sprite::Sprite;
 
+#[cfg(feature = "cli")]
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
     let image = ImageReader::open(path)?.decode()?;
@@ -55,6 +57,7 @@ fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     Ok(image)
 }
 
+#[cfg(feature = "cli")]
 fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
     let path = PathBuf::from(s);
     let file = File::open(path).map_err(|e| format!("Failed to open config file: {}", e))?;
@@ -65,6 +68,7 @@ fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
     Ok(configs)
 }
 
+#[cfg(feature = "cli")]
 fn load_input(s: &str) -> Result<Input, &'static str> {
     if let Ok(image) = load_image(s) {
         Ok(Input::Image(image))
@@ -75,86 +79,15 @@ fn load_input(s: &str) -> Result<Input, &'static str> {
     }
 }
 
-#[cfg(feature = "sdl2")]
-struct SdlDraw {
-    canvas: Canvas<Window>,
-    events: EventPump,
-    pub textures: HashMap<u64, Texture>,
-}
 
-#[cfg(feature = "sdl2")]
-impl SdlDraw {
-    pub fn new(size: Size, tiles: &[Tile<Sprite>], vsync: bool, fullscreen: bool) -> Self {
-        let context = sdl2::init().unwrap();
-        let video = context.video().unwrap();
-
-        let mut window = video
-            .window(
-                "Wave Function Collapse",
-                size.width as u32,
-                size.height as u32,
-            )
-            .position_centered()
-            .build()
-            .map_err(|e| e.to_string())
-            .unwrap();
-
-        if fullscreen {
-            window.set_fullscreen(FullscreenType::True).unwrap();
-        }
-
-        if window.fullscreen_state() != FullscreenType::Off {
-            context.mouse().show_cursor(false);
-        }
-
-        let mut builder = window.into_canvas().target_texture();
-
-        if vsync {
-            builder = builder.present_vsync();
-        }
-
-        let canvas = builder.build().map_err(|e| e.to_string()).unwrap();
-
-        let events = context.event_pump().unwrap();
-        let texture_creator = canvas.texture_creator();
-        let mut textures = HashMap::new();
-
-        for tile in tiles {
-            if textures.contains_key(&tile.get_id()) {
-                continue;
-            }
-
-            let rgba = tile.value.image.to_rgba8();
-            let (width, height) = tile.value.image.dimensions();
-
-            let mut texture = texture_creator
-                .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
-                .map_err(|e| e.to_string())
-                .unwrap();
-
-            texture
-                .with_lock(None, |buffer: &mut [u8], _: usize| {
-                    buffer.copy_from_slice(&rgba);
-                })
-                .unwrap();
-
-            textures.insert(tile.get_id(), texture);
-        }
-
-        Self {
-            canvas,
-            events,
-            textures,
-        }
-    }
-}
-
+#[cfg(feature = "cli")]
 #[derive(Debug)]
 enum Input {
     Image(DynamicImage),
     Config(Vec<TileConfig>),
 }
 
+#[cfg(feature = "cli")]
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Wave Function Collapse",
@@ -223,7 +156,7 @@ struct Opt {
     completions: Option<Shell>,
 }
 
-#[cfg(feature = "image")]
+#[cfg(feature = "cli")]
 fn main() {
     use std::sync::Arc;
 
@@ -298,15 +231,16 @@ fn main() {
     );
 
     #[cfg(feature = "sdl2")]
-    let mut sdl_draw = if opt.visual {
+    let mut renderer = if opt.visual {
         let (tile_width, tile_height) = tiles[0].value.image.dimensions();
         let mut size = opt.output_size;
 
         assert_eq!(tile_width, tile_height);
 
         size.scale(tile_width.try_into().unwrap());
-
-        Some(SdlDraw::new(size, &tiles, opt.vsync, opt.fullscreen))
+        
+        let config = RendererConfig::new(opt.vsync, opt.fullscreen, (tile_width, tile_height));
+        Some(SdlRenderer::new(size, &tiles, config).unwrap())
     } else {
         None
     };
@@ -315,19 +249,12 @@ fn main() {
         progress.set_position(max_progress - wfc.remaining() as u64);
 
         #[cfg(feature = "sdl2")]
-        if let Some(draw) = sdl_draw.as_mut() {
-            for event in draw.events.poll_iter() {
-                match event {
-                    Event::Quit { .. }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::Escape),
-                        ..
-                    } => return,
-                    _ => {}
-                }
+        if let Some(renderer) = renderer.as_mut() {
+            if !renderer.handle_events() || renderer.should_quit() {
+                return;
             }
 
-            update_canvas(&wfc, draw, opt.debug);
+            update_canvas_with_renderer(&wfc, renderer, opt.debug);
         }
 
         #[cfg(feature = "sdl2")]
@@ -342,8 +269,8 @@ fn main() {
     }
 
     #[cfg(feature = "sdl2")]
-    if let Some(draw) = sdl_draw.as_mut() {
-        update_canvas(&wfc, draw, opt.debug);
+    if let Some(renderer) = renderer.as_mut() {
+        update_canvas_with_renderer(&wfc, renderer, opt.debug);
     }
 
     progress.finish();
@@ -386,54 +313,16 @@ fn main() {
     canvas.save(opt.output.unwrap().as_path()).unwrap();
 }
 
-// todo only draw updated
 #[cfg(feature = "sdl2")]
-fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw, show_debug: bool) {
-    use sdl2::render::BlendMode;
-
-    let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
-        .value
-        .image
-        .dimensions();
-
-    context.canvas.clear();
-    context.canvas.set_blend_mode(BlendMode::Blend);
+fn update_canvas_with_renderer<R: Renderer>(wfc: &Wave<Tile<Sprite>>, renderer: &mut R, show_debug: bool) 
+where
+    <R as Renderer>::Error: std::fmt::Debug,
+{
+    renderer.clear();
 
     for (x, y, cell) in &wfc.grid {
-
-        let rect = Rect::new(
-            x as i32 * tile_width as i32,
-            y as i32 * tile_height as i32,
-            tile_width,
-            tile_height,
-        );
-
-        if let Some(tile) = cell.collapsed() {
-            // todo streamline
-            let texture = context.textures.get(&tile.get_id()).unwrap();
-
-            context.canvas.set_draw_color(Color::GRAY);
-            context.canvas.fill_rect(rect).unwrap();
-            context.canvas.copy(texture, None, Some(rect)).unwrap();
-        } else {
-            let mut color = if cell.entropy() > 0 {
-                let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
-                let value = (255.0 * (1.0 - ratio)) as u8;
-
-                Color::RGB(0, value / 3, value / 2)
-            } else {
-                Color::BLACK
-            };
-
-
-            if show_debug && wfc.data.get(x, y).map(|x| x.is_some()).unwrap_or(false) {
-                color.r = 80;
-            }
-
-            context.canvas.set_draw_color(color);
-            context.canvas.fill_rect(rect).unwrap();
-        }
+        renderer.draw_cell(x, y, cell, cell.base_entropy(), show_debug && wfc.data.get(x, y).map(|x| x.is_some()).unwrap_or(false)).unwrap();
     }
 
-    context.canvas.present();
+    renderer.present();
 }

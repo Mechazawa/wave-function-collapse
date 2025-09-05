@@ -49,6 +49,10 @@ impl FromStr for Size {
 }
 
 impl Size {
+    pub fn new(width: usize, height: usize) -> Self {
+        Self { width, height }
+    }
+    
     pub fn scale(&mut self, factor: usize) {
         self.width *= factor;
         self.height *= factor;
