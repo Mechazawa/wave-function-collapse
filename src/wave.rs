@@ -131,20 +131,25 @@ where
         self.mark(x, y);
     }
 
+    /// Attempts to collapse a cell with the lowest entropy in the smallest collapsable area.
+    /// Returns the position of the collapsed cell, or None if no such cell exists.
     pub fn maybe_collapse(&mut self) -> Option<Position> {
         let areas = self.collapsable_areas();
-        let options = areas
+
+        let options: Vec<_> = areas
             .first()?
-            .into_iter()
+            .iter()
             .map(|&(x, y)| (
                 x, y,
                 self.grid.get(x, y).map_or(1, |cell| cell.entropy())
             ))
-            .filter(|&(_, _, e)| e > 1);
+            .filter(|&(_, _, e)| e > 1)
+            .collect();
 
-        let min_entropy = options.clone().map(|(_, _, e)| e).min()?;
+        let min_entropy = options.iter().map(|&(_, _, e)| e).min()?;
 
         options
+            .into_iter()
             .filter(|&(_, _, e)| e == min_entropy)
             .choose_stable(&mut self.rng)
             .map(|(x, y, _)| {
