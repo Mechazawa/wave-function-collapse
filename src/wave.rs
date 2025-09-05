@@ -132,38 +132,25 @@ where
     }
 
     pub fn maybe_collapse(&mut self) -> Option<Position> {
-        let mut options = Vec::new();
-        let mut lowest_entropy = usize::MAX;
         let areas = self.collapsable_areas();
+        let options = areas
+            .first()?
+            .into_iter()
+            .map(|&(x, y)| (
+                x, y,
+                self.grid.get(x, y).map_or(1, |cell| cell.entropy())
+            ))
+            .filter(|&(_, _, e)| e > 1);
 
-        for &(x, y) in areas.first().unwrap() {
-            let cell = self.grid.get(x, y).unwrap();
-            // for (x, y, cell) in &self.grid {
-            let entropy = cell.entropy();
+        let min_entropy = options.clone().map(|(_, _, e)| e).min()?;
 
-            if entropy <= 1 {
-                continue;
-            }
-
-            if entropy < lowest_entropy {
-                options.clear();
-                lowest_entropy = entropy;
-            }
-
-            if entropy == lowest_entropy {
-                options.push((x, y));
-            }
-        }
-
-        let maybe = options.into_iter().choose_stable(&mut self.rng);
-
-        match maybe {
-            Some((x, y)) => {
+        options
+            .filter(|&(_, _, e)| e == min_entropy)
+            .choose_stable(&mut self.rng)
+            .map(|(x, y, _)| {
                 self.collapse(x, y);
-                Some((x, y))
-            }
-            None => None,
-        }
+                (x, y)
+            })
     }
 
     fn mark(&mut self, cx: usize, cy: usize) {
