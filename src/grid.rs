@@ -110,7 +110,7 @@ where
         self.width * self.height
     }
 
-    pub fn iter(&self) -> GridIter<T> {
+    pub fn iter(&self) -> GridIter<'_, T> {
         GridIter {
             grid: self,
             pos: 0,
