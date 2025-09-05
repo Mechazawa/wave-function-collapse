@@ -1,5 +1,5 @@
-use std::collections::{HashSet, VecDeque};
-use std::hash::{BuildHasher, Hasher};
+use std::collections::VecDeque;
+use fxhash::FxHashSet;
 
 use log::{trace, warn};
 use rand::seq::IteratorRandom;
@@ -9,34 +9,8 @@ use rand_xorshift::XorShiftRng;
 use crate::grid::{Direction, Grid, Neighbors, Position};
 use crate::superstate::{Collapsable, SuperState};
 
-/// https://github.com/chris-morgan/anymap/blob/2e9a5704/src/lib.rs#L599
-#[derive(Debug, Clone, Copy, Default)]
-pub struct NoOpHasher(u64);
-
-impl Hasher for NoOpHasher {
-    fn write(&mut self, _bytes: &[u8]) {
-        unimplemented!("This NoOpHasher can only handle u64s")
-    }
-
-    fn write_u64(&mut self, i: u64) {
-        self.0 = i;
-    }
-
-    fn finish(&self) -> u64 {
-        self.0
-    }
-}
-
-impl BuildHasher for NoOpHasher {
-    type Hasher = Self;
-
-    fn build_hasher(&self) -> Self::Hasher {
-        *self
-    }
-}
-
 type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
-pub type Set<T> = HashSet<T, NoOpHasher>;
+pub type Set<T> = FxHashSet<T>;
 
 #[derive(Debug, PartialEq, Eq)]
 enum CollapseReason {
@@ -57,7 +31,6 @@ where
     rng: Box<dyn RngCore>,
     last_rollback: usize,
     rollback_penalty: f64,
-    // tracker: PropegationTracker,
 }
 
 impl<T> Wave<T>
@@ -74,7 +47,6 @@ where
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
             last_rollback: 0,
             rollback_penalty: 0.0,
-            // tracker: Default::default(),
         }
     }
 
@@ -156,7 +128,6 @@ where
     fn collapse(&mut self, x: usize, y: usize) {
         self.grid.get_mut(x, y).unwrap().collapse(&mut self.rng);
         self.collapsed.push(((x, y), CollapseReason::Explicit));
-        // self.tracker.next(x, y);
         self.mark(x, y);
     }
 
@@ -292,7 +263,6 @@ where
 
             if reason == CollapseReason::Explicit {
                 count -= 1;
-                // self.tracker.back();
 
                 if count == 0 {
                     break;
@@ -350,7 +320,6 @@ where
             let item = self.grid.get(x, y).unwrap();
 
             item.entropy() == 1
-            // item.entropy() == 1 || self.tracker.seen(x, y)
         });
 
         let mut stack: Vec<Position> = Default::default();

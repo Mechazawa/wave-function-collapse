@@ -17,7 +17,7 @@ mod image_imports {
     pub use image::ImageBuffer;
     pub use serde::Deserialize;
     pub use std::collections::hash_map::DefaultHasher;
-    pub use std::collections::HashMap;
+    pub use fxhash::FxHashMap;
     pub use std::hash::Hash;
     pub use std::hash::Hasher;
     pub use std::path::PathBuf;
@@ -91,7 +91,7 @@ impl Tile<Sprite> {
         let grid_width = image_width as usize / tile_size.width;
         let grid_height = image_height as usize / tile_size.height;
 
-        let mut unique: HashMap<u64, Self> = Default::default();
+        let mut unique: FxHashMap<u64, Self> = Default::default();
 
         debug!("Input grid: {grid_width}x{grid_height}");
 
