@@ -94,7 +94,10 @@ where
             let chosen_index = self.possible.iter().position(|v| v.get_id() == chosen_id);
 
             if let Some(pos) = chosen_index {
-                self.possible = vec![self.possible.swap_remove(pos)];
+                let chosen = self.possible.swap_remove(pos);
+
+                self.possible.clear();
+                self.possible.push(chosen);
             }
 
             self.update_entropy();
