@@ -49,11 +49,6 @@ impl FromStr for Size {
 }
 
 impl Size {
-    pub fn scale(&mut self, factor: usize) {
-        self.width *= factor;
-        self.height *= factor;
-    }
-
     pub fn uniform(size: usize) -> Self {
         Self {
             width: size,
