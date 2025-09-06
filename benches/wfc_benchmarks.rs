@@ -10,7 +10,7 @@ use wave_function_collapse::{
 };
 
 #[cfg(feature = "image")]
-use wave_function_collapse::sprite::Sprite;
+use image::DynamicImage;
 
 // Fixed seed for deterministic benchmarks
 const BENCHMARK_SEED: u64 = 12345;
@@ -150,7 +150,7 @@ fn bench_tile_from_image(c: &mut Criterion) {
         let size = Size::uniform(*tile_size);
         
         group.bench_with_input(*name, &(image, size), |b, (img, tile_size)| {
-            b.iter(|| black_box(Tile::<Sprite>::from_image(img, tile_size)));
+            b.iter(|| black_box(Tile::<DynamicImage>::from_image(img, tile_size)));
         });
     }
     

@@ -1,5 +1,4 @@
 pub mod grid;
-pub mod sprite;
 pub mod superstate;
 pub mod tile;
 pub mod wave;

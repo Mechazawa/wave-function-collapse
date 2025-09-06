@@ -49,3 +49,7 @@ threaded = ["dep:rayon", "dep:lazy_static"]
 
 [profile.release]
 lto = "fat"
+
+[profile.profiling]
+inherits = "release"
+debug = true

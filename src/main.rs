@@ -1,5 +1,4 @@
 mod grid;
-mod sprite;
 mod superstate;
 mod tile;
 mod wave;
@@ -43,7 +42,6 @@ use {
     sdl2::render::{Canvas, Texture},
     sdl2::video::Window,
     sdl2::EventPump,
-    sprite::Sprite,
     std::collections::HashMap,
     superstate::Collapsable,
 };
@@ -84,7 +82,7 @@ struct SdlDraw {
 
 #[cfg(feature = "sdl2")]
 impl SdlDraw {
-    pub fn new(size: Size, tiles: &[Tile<Sprite>], vsync: bool, fullscreen: bool) -> Self {
+    pub fn new(size: Size, tiles: &[Tile<DynamicImage>], vsync: bool, fullscreen: bool) -> Self {
         let context = sdl2::init().unwrap();
         let video = context.video().unwrap();
 
@@ -124,8 +122,8 @@ impl SdlDraw {
                 continue;
             }
 
-            let rgba = tile.value.image.to_rgba8();
-            let (width, height) = tile.value.image.dimensions();
+            let rgba = tile.value.as_ref().to_rgba8();
+            let (width, height) = tile.value.as_ref().dimensions();
 
             let mut texture = texture_creator
                 .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
@@ -299,7 +297,7 @@ fn main() {
 
     #[cfg(feature = "sdl2")]
     let mut sdl_draw = if opt.visual {
-        let (tile_width, tile_height) = tiles[0].value.image.dimensions();
+        let (tile_width, tile_height) = tiles[0].value.as_ref().dimensions();
         let mut size = opt.output_size;
 
         assert_eq!(tile_width, tile_height);
@@ -361,7 +359,7 @@ fn main() {
     }
 
     // drawing
-    let (tile_width, tile_height) = tiles[0].value.image.dimensions();
+    let (tile_width, tile_height) = tiles[0].value.as_ref().dimensions();
 
     trace!("Tile size: {tile_width}x{tile_height}");
 
@@ -374,7 +372,7 @@ fn main() {
         if let Some(t) = cell.collapsed() {
             image::imageops::overlay(
                 &mut canvas,
-                &t.value.image,
+                t.value.as_ref(),
                 x as i64 * tile_width as i64,
                 y as i64 * tile_height as i64,
             );
@@ -388,12 +386,12 @@ fn main() {
 
 // todo only draw updated
 #[cfg(feature = "sdl2")]
-fn update_canvas(wfc: &Wave<Tile<Sprite>>, context: &mut SdlDraw, show_debug: bool) {
+fn update_canvas(wfc: &Wave<Tile<DynamicImage>>, context: &mut SdlDraw, show_debug: bool) {
     use sdl2::render::BlendMode;
 
     let (tile_width, tile_height) = wfc.grid.get(0, 0).unwrap().possible[0]
         .value
-        .image
+        .as_ref()
         .dimensions();
 
     context.canvas.clear();

@@ -8,7 +8,7 @@ use wave_function_collapse::{
 };
 
 #[cfg(feature = "image")]
-use wave_function_collapse::sprite::Sprite;
+use image::DynamicImage;
 
 // Fixed seed for deterministic tests
 const TEST_SEED: u64 = 42;
@@ -231,7 +231,7 @@ fn test_tile_from_image_consistency() {
         })
     );
     
-    let tiles = Tile::<Sprite>::from_image(&image, &tile_size);
+    let tiles = Tile::<DynamicImage>::from_image(&image, &tile_size);
     
     // Should create some unique tiles
     assert!(!tiles.is_empty());

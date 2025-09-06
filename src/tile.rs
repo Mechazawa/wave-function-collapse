@@ -10,21 +10,32 @@ use log::debug;
 
 #[cfg(feature = "image")]
 mod image_imports {
-    pub use crate::sprite::Sprite;
     pub use image::io::Reader as ImageReader;
     pub use image::DynamicImage;
     pub use image::GenericImageView;
     pub use image::ImageBuffer;
+    pub use image::Pixel;
+    pub use num_traits::cast::ToPrimitive;
     pub use serde::Deserialize;
     pub use std::collections::hash_map::{DefaultHasher, Entry};
     pub use fxhash::FxHashMap;
-    pub use std::hash::Hash;
     pub use std::hash::Hasher;
     pub use std::path::PathBuf;
 }
 
 #[cfg(feature = "image")]
 use image_imports::*;
+
+#[cfg(feature = "image")]
+fn hash_dynamic_image<H: Hasher>(image: &DynamicImage, state: &mut H) {
+    for pixel in image.pixels() {
+        for channel in pixel.2.channels() {
+            if let Some(value) = channel.to_u8() {
+                state.write_u8(value)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Tile<T> {
@@ -44,7 +55,7 @@ pub struct TileConfig {
 }
 
 #[cfg(feature = "image")]
-impl Tile<Sprite> {
+impl Tile<DynamicImage> {
     pub fn from_config(configs: &[TileConfig]) -> Vec<Self> {
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
@@ -146,11 +157,8 @@ impl Tile<Sprite> {
 
     pub fn new_image_tile(image: DynamicImage) -> Self {
         let mut hasher = DefaultHasher::new();
-        let sprite = Sprite { image };
-
-        sprite.hash(&mut hasher);
-
-        Self::new(hasher.finish(), sprite)
+        hash_dynamic_image(&image, &mut hasher);
+        Self::new(hasher.finish(), image)
     }
 }
 
