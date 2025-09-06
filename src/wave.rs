@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use fxhash::FxHashSet;
 
 use log::{trace, warn};
-use rand::seq::IteratorRandom;
+use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
@@ -135,31 +135,42 @@ where
     /// Returns the position of the collapsed cell, or None if no such cell exists.
     pub fn maybe_collapse(&mut self) -> Option<Position> {
         let areas = self.collapsable_areas();
-
-        let options: Vec<_> = areas
-            .first()?
-            .iter()
-            .map(|&(x, y)| (
-                x, y,
-                self.grid.get(x, y).map_or(1, |cell| cell.entropy())
-            ))
-            .filter(|&(_, _, e)| e > 1)
-            .collect();
-
-        let min_entropy = options.iter().map(|&(_, _, e)| e).min()?;
-
-        options
-            .into_iter()
-            .filter(|&(_, _, e)| e == min_entropy)
-            .choose_stable(&mut self.rng)
-            .map(|(x, y, _)| {
+        let first_area = areas.first()?;
+        
+        // Single-pass algorithm to find minimum entropy and collect candidates
+        let mut min_entropy = usize::MAX;
+        let mut candidates = Vec::new();
+        
+        for &(x, y) in first_area {
+            let entropy = self.grid.get(x, y).map_or(1, |cell| cell.entropy());
+            
+            if entropy <= 1 {
+                continue; // Skip collapsed/invalid cells
+            }
+            
+            if entropy < min_entropy {
+                min_entropy = entropy;
+                candidates.clear();
+                candidates.push((x, y));
+            } else if entropy == min_entropy {
+                candidates.push((x, y));
+            }
+        }
+        
+        if candidates.is_empty() {
+            return None;
+        }
+        
+        candidates
+            .choose(&mut self.rng)
+            .map(|&(x, y)| {
                 self.collapse(x, y);
                 (x, y)
             })
     }
 
     fn mark(&mut self, cx: usize, cy: usize) {
-        let raw_possible_states: Vec<T::Identifier> = self
+        let possible_states: Set<T::Identifier> = self
             .grid
             .get(cx, cy)
             .unwrap()
@@ -168,22 +179,19 @@ where
             .map(|t| t.get_id())
             .collect();
 
-        let possible_states: Set<T::Identifier> = raw_possible_states.into_iter().collect();
+        // Collect neighbor positions to avoid borrowing conflicts
+        let neighbor_positions: Vec<_> = self.data
+            .get_neighbor_positions(cx, cy)
+            .into_iter()
+            .filter_map(|(dir, pos)| pos.map(|p| (dir, p)))
+            .collect();
 
-        for (direction, pos) in self.data.get_neighbor_positions(cx, cy) {
-            if pos.is_none() {
-                continue;
-            }
-
-            let (x, y) = pos.unwrap();
+        for (direction, (x, y)) in neighbor_positions {
             match self.data.get_mut(x, y).unwrap() {
                 None => {
                     let mut neighbors = Neighbors::default();
-
                     neighbors[direction.invert()] = possible_states.clone();
-
                     self.data.set(x, y, Some(neighbors)).unwrap();
-
                     self.stack.push_back((x, y));
                 }
                 Some(neighbors) => {
@@ -241,11 +249,7 @@ where
             return;
         }
 
-        // empty stack
-        // self.stack.clear();
-        self.data = Grid::new(self.grid.width(), self.grid.height(), &mut |_, _| {
-            Default::default()
-        });
+        self.data.reset_to_default();
 
         // revert last step of collapse stack
         while let Some(((x, y), reason)) = self.collapsed.pop() {

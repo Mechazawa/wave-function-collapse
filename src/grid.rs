@@ -242,6 +242,16 @@ where
 
         return output;
     }
+    
+    /// Efficiently reset all grid cells to default value without reallocating
+    pub fn reset_to_default(&mut self) 
+    where
+        T: Default,
+    {
+        for cell in &mut self.data {
+            *cell = T::default();
+        }
+    }
 }
 
 impl<'a, T> IntoIterator for &'a Grid<T>

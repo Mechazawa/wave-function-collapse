@@ -75,14 +75,14 @@ where
     }
 
     pub fn collapsed(&self) -> Option<Arc<&T>> {
-        match self.possible.len() {
+        match self.entropy {
             1 => Some(Arc::new(self.possible.get(0)?.as_ref())),
             _ => None,
         }
     }
 
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
-        if self.possible.len() > 1 {
+        if self.entropy > 1 {
             self.possible.sort_by_key(|a| a.get_id());
 
             let chosen_id = self
@@ -105,9 +105,9 @@ where
     }
 
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
-        if self.entropy() > 1 {
+        if self.entropy > 1 {
             #[cfg(feature = "threaded")]
-            if self.possible.len() > *PAR_MIN_LEN {
+            if self.entropy > *PAR_MIN_LEN {
                 self.possible = self
                     .possible
                     .par_iter()

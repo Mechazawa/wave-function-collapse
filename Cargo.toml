@@ -26,6 +26,21 @@ simplelog = { version = "0.12", features = ["paris"] }
 structopt = "0.3"
 structopt-flags = "0.3"
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "wfc_benchmarks"
+harness = false
+
+[lib]
+name = "wave_function_collapse"
+path = "src/lib.rs"
+
+[[bin]]
+name = "wave-function-collapse"
+path = "src/main.rs"
+
 [features]
 default = ["image", "sdl2"]
 image = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]

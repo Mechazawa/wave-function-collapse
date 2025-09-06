@@ -16,7 +16,7 @@ mod image_imports {
     pub use image::GenericImageView;
     pub use image::ImageBuffer;
     pub use serde::Deserialize;
-    pub use std::collections::hash_map::DefaultHasher;
+    pub use std::collections::hash_map::{DefaultHasher, Entry};
     pub use fxhash::FxHashMap;
     pub use std::hash::Hash;
     pub use std::hash::Hasher;
@@ -112,12 +112,16 @@ impl Tile<Sprite> {
             let new_tile = Tile::new_image_tile(DynamicImage::from(buffer));
             let tile_id = new_tile.get_id();
 
-            unique.insert(tile_id, new_tile);
+            match unique.entry(tile_id) {
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().weight += 1;
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(new_tile);
+                }
+            }
 
-            unique.get_mut(&tile_id).unwrap().weight += 1;
-
-            assert_ne!(unique.get(&tile_id).unwrap().get_weight(), 1);
-            unique.get(&tile_id).unwrap().get_id()
+            tile_id
         });
 
         debug!("Populating neighbors");
@@ -128,18 +132,12 @@ impl Tile<Sprite> {
             for (direction, maybe) in grid.get_neighbors(x, y) {
                 if let Some(value) = maybe {
                     tile.neighbors[direction].insert(*value);
-                    assert!(!tile.neighbors[direction].is_empty());
                 }
             }
-
-            assert!(tile.neighbors.len() > 0);
         }
 
-        let output: Vec<Self> = unique.values().cloned().collect::<Vec<Self>>();
-
-        for tile in output.iter() {
-            assert!(tile.neighbors.len() > 0);
-        }
+        // Convert HashMap values to Vec more efficiently
+        let output: Vec<Self> = unique.into_values().collect();
 
         // todo: Keep track of rotation
 
