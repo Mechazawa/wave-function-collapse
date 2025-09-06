@@ -150,7 +150,7 @@ impl Tile<DynamicImage> {
         for pixel in image.pixels() {
             for channel in pixel.2.channels() {
                 if let Some(value) = channel.to_u8() {
-                    state.write_u8(value)
+                    hasher.write_u8(value)
                 }
             }
         }
