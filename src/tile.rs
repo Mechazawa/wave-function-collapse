@@ -26,17 +26,6 @@ mod image_imports {
 #[cfg(feature = "image")]
 use image_imports::*;
 
-#[cfg(feature = "image")]
-fn hash_dynamic_image<H: Hasher>(image: &DynamicImage, state: &mut H) {
-    for pixel in image.pixels() {
-        for channel in pixel.2.channels() {
-            if let Some(value) = channel.to_u8() {
-                state.write_u8(value)
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Tile<T> {
     pub value: Box<T>,
@@ -157,7 +146,15 @@ impl Tile<DynamicImage> {
 
     pub fn new_image_tile(image: DynamicImage) -> Self {
         let mut hasher = DefaultHasher::new();
-        hash_dynamic_image(&image, &mut hasher);
+
+        for pixel in image.pixels() {
+            for channel in pixel.2.channels() {
+                if let Some(value) = channel.to_u8() {
+                    state.write_u8(value)
+                }
+            }
+        }
+
         Self::new(hasher.finish(), image)
     }
 }
