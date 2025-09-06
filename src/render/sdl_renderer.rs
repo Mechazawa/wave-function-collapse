@@ -1,4 +1,4 @@
-use super::{Renderer, RenderEvent};
+use super::Renderer;
 use crate::tile::Tile;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
@@ -190,32 +190,18 @@ impl Renderer<DynamicImage> for SdlRenderer {
         Ok(())
     }
 
-    fn handle_event(&mut self, event: &RenderEvent) -> Result<(), Self::Error> {
-        self.handle_events();
-
-        if self.should_quit {
-            return Ok(());
-        }
-
-        match event {
-            RenderEvent::Progress { .. } => {
-                // For now, we'll need access to the grid state separately
-                // This is a limitation of the simplified event system
-            }
-            RenderEvent::Completed => {
-                // Final rendering would need grid access
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
 
     fn should_quit(&mut self) -> bool {
         self.should_quit
     }
 
     fn update(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), Self::Error> {
+        self.handle_events();
+
+        if self.should_quit {
+            return Ok(());
+        }
+
         self.frame_counter += 1;
         
         // Render every frame if render_every_step is true (slow mode)

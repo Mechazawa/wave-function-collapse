@@ -1,4 +1,4 @@
-use super::{Renderer, RenderEvent};
+use super::Renderer;
 use crate::tile::Tile;
 
 use image::{DynamicImage, GenericImageView, RgbaImage};
@@ -60,19 +60,6 @@ impl Renderer<DynamicImage> for ImageRenderer {
         Ok(())
     }
 
-    fn handle_event(&mut self, event: &RenderEvent) -> Result<(), Self::Error> {
-        match event {
-            RenderEvent::Completed => {
-                // For now, we'll need access to the final grid separately
-                // This is a limitation of the simplified event system
-            }
-            _ => {
-                // Image renderer only cares about the final result
-            }
-        }
-        
-        Ok(())
-    }
 
     fn finalize(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), Self::Error> {
         self.create_final_image_from_wfc(wfc)?;

@@ -1,6 +1,6 @@
 use crate::cli::{AppConfig, Input};
 use crate::grid::{Grid, Size};
-use crate::render::{Renderer, RenderEvent};
+use crate::render::Renderer;
 use crate::superstate::SuperState;
 use crate::tile::Tile;
 use crate::wave::Wave;
@@ -96,13 +96,6 @@ impl WfcApp {
                 .progress_chars("#>-"),
         );
 
-        // Emit start event
-        let start_event = RenderEvent::Started;
-        
-        for renderer in &mut renderers {
-            renderer.handle_event(&start_event)?;
-        }
-
         // Main generation loop
         while !wfc.done() {
             progress.set_position(max_progress - wfc.remaining() as u64);
@@ -112,11 +105,8 @@ impl WfcApp {
                 return Ok(());
             }
 
-            // Emit progress event
-            let progress_event = RenderEvent::Progress;
-            
+            // Update renderers with current state
             for renderer in &mut renderers {
-                renderer.handle_event(&progress_event)?;
                 renderer.update(&wfc)?;
             }
 
@@ -130,13 +120,6 @@ impl WfcApp {
 
             #[cfg(not(feature = "visual"))]
             wfc.tick();
-        }
-
-        // Emit completion event
-        let completion_event = RenderEvent::Completed;
-        
-        for renderer in &mut renderers {
-            renderer.handle_event(&completion_event)?;
         }
 
         progress.finish();

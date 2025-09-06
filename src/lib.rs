@@ -6,7 +6,7 @@ pub mod wave;
 
 // Re-export common types for easier access
 pub use grid::{Grid, Direction, Position, Size};
-pub use render::{Renderer, RenderEvent};
+pub use render::Renderer;
 pub use superstate::{SuperState, Collapsable};
 pub use tile::Tile;
 pub use wave::Wave;
