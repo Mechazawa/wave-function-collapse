@@ -42,10 +42,17 @@ name = "wave-function-collapse"
 path = "src/main.rs"
 
 [features]
-default = ["image", "sdl2"]
-image = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]
-sdl2 = ["image", "dep:sdl2"]
+default = ["image-output", "visual"]
+
+# Core features
+image-input = ["dep:image", "dep:imageproc", "dep:serde", "dep:serde_json", "dep:rusttype"]
+image-output = ["image-input"]
+visual = ["image-input", "dep:sdl2"]
 threaded = ["dep:rayon", "dep:lazy_static"]
+
+# Convenience aliases
+image = ["image-input"]  # Backward compatibility
+sdl2 = ["visual"]        # Backward compatibility
 
 [profile.release]
 lto = "fat"

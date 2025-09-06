@@ -8,7 +8,7 @@ use crate::wave::Set;
 use enum_map::enum_map;
 use log::debug;
 
-#[cfg(feature = "image")]
+#[cfg(feature = "image-input")]
 mod image_imports {
     pub use image::io::Reader as ImageReader;
     pub use image::DynamicImage;
@@ -23,7 +23,7 @@ mod image_imports {
     pub use std::path::PathBuf;
 }
 
-#[cfg(feature = "image")]
+#[cfg(feature = "image-input")]
 use image_imports::*;
 
 #[derive(Debug, Clone)]
@@ -36,14 +36,14 @@ pub struct Tile<T> {
     pub weight: usize,
 }
 
-#[cfg(feature = "image")]
+#[cfg(feature = "image-input")]
 #[derive(Debug, Deserialize)]
 pub struct TileConfig {
-    image: PathBuf,
-    slots: Vec<String>,
+    pub image: PathBuf,
+    pub slots: Vec<String>,
 }
 
-#[cfg(feature = "image")]
+#[cfg(feature = "image-input")]
 impl Tile<DynamicImage> {
     pub fn from_config(configs: &[TileConfig]) -> Vec<Self> {
         let mut output = Vec::new();
@@ -195,5 +195,22 @@ impl<T: Clone + Sync + Send> Collapsable for Tile<T> {
 
     fn get_weight(&self) -> usize {
         self.weight
+    }
+}
+
+// Implement Collapsable for Arc<Tile<T>> to enable shared ownership
+impl<T: Clone + Sync + Send> Collapsable for std::sync::Arc<Tile<T>> {
+    type Identifier = u64;
+
+    fn test(&self, neighbors: &Neighbors<Set<Self::Identifier>>) -> bool {
+        self.as_ref().test(neighbors)
+    }
+
+    fn get_id(&self) -> Self::Identifier {
+        self.as_ref().get_id()
+    }
+
+    fn get_weight(&self) -> usize {
+        self.as_ref().get_weight()
     }
 }
