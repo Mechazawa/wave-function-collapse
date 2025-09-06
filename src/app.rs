@@ -11,7 +11,7 @@ use crate::render::sdl_renderer::{SdlRenderer, SdlConfig};
 #[cfg(feature = "image-output")]
 use crate::render::image_renderer::ImageRenderer;
 
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{info, warn};
 use rand::rngs::OsRng;
@@ -75,8 +75,8 @@ impl WfcApp {
 
         let mut wfc = Wave::new(grid, seed);
 
-        // Set up renderers
-        let mut renderers = self.create_renderers()?;
+        // Set up renderers (now that we have tiles with actual dimensions)
+        let mut renderers = self.create_renderers(&tiles)?;
 
         // Initialize all renderers
         for renderer in &mut renderers {
@@ -157,27 +157,36 @@ impl WfcApp {
         Ok(())
     }
 
-    fn create_renderers(&self) -> Result<Vec<Box<dyn Renderer<DynamicImage, Error = String>>>, Box<dyn std::error::Error>> {
+    fn create_renderers(&self, tiles: &[Tile<DynamicImage>]) -> Result<Vec<Box<dyn Renderer<DynamicImage, Error = String>>>, Box<dyn std::error::Error>> {
         let mut renderers: Vec<Box<dyn Renderer<DynamicImage, Error = String>>> = Vec::new();
 
         // Add SDL2 renderer if requested
         #[cfg(feature = "visual")]
         if self.config.renderer.visual {
-            // We'll determine the tile size during initialization from the actual tiles
-            let tile_size = 16; // Default tile size, will be updated during initialization
-            let mut size = self.config.output_size;
-            size.scale(tile_size);
+            if let Some(first_tile) = tiles.first() {
+                // Get the actual tile dimensions
+                let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
+                
+                // Calculate window size based on actual tile size
+                let window_width = self.config.output_size.width * tile_width as usize;
+                let window_height = self.config.output_size.height * tile_height as usize;
+                
+                let window_size = Size {
+                    width: window_width,
+                    height: window_height,
+                };
 
-            let sdl_config = SdlConfig {
-                window_size: size,
-                vsync: self.config.renderer.vsync,
-                fullscreen: self.config.renderer.fullscreen,
-                show_debug: self.config.renderer.debug,
-                render_every_step: self.config.renderer.slow,
-            };
+                let sdl_config = SdlConfig {
+                    window_size,
+                    vsync: self.config.renderer.vsync,
+                    fullscreen: self.config.renderer.fullscreen,
+                    show_debug: self.config.renderer.debug,
+                    render_every_step: self.config.renderer.slow,
+                };
 
-            let sdl_renderer = SdlRenderer::new(sdl_config)?;
-            renderers.push(Box::new(sdl_renderer));
+                let sdl_renderer = SdlRenderer::new(sdl_config)?;
+                renderers.push(Box::new(sdl_renderer));
+            }
         }
 
         // Add image renderer if output path is specified
