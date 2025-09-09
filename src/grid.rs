@@ -235,7 +235,7 @@ where
             }
         }
 
-        return output;
+        output
     }
     
     /// Efficiently reset all grid cells to default value without reallocating

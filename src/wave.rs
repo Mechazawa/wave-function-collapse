@@ -74,10 +74,8 @@ where
             self.tick_cell(x, y);
 
             Some((x, y))
-        } else if let Some(value) = self.maybe_collapse() {
-            return Some(value);
         } else {
-            None
+            self.maybe_collapse()
         }
     }
 
@@ -351,7 +349,7 @@ where
             }
         }
 
-        output.sort_by(|a, b| a.len().cmp(&b.len()));
+        output.sort_by_key(|a| a.len());
 
         output
     }

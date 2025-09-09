@@ -74,9 +74,9 @@ where
         self.entropy = self.possible.len();
     }
 
-    pub fn collapsed(&self) -> Option<Arc<&T>> {
+    pub fn collapsed(&self) -> Option<&T> {
         match self.entropy {
-            1 => Some(Arc::new(self.possible.get(0)?.as_ref())),
+            1 => Some(self.possible.first()?.as_ref()),
             _ => None,
         }
     }

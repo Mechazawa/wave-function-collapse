@@ -19,6 +19,9 @@ use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
 
+type RendererVec = Vec<Box<dyn Renderer<DynamicImage, Error = String>>>;
+type RendererResult = Result<RendererVec, Box<dyn std::error::Error>>;
+
 pub struct WfcApp {
     config: AppConfig,
 }
@@ -140,8 +143,8 @@ impl WfcApp {
         Ok(())
     }
 
-    fn create_renderers(&self, tiles: &[Tile<DynamicImage>]) -> Result<Vec<Box<dyn Renderer<DynamicImage, Error = String>>>, Box<dyn std::error::Error>> {
-        let mut renderers: Vec<Box<dyn Renderer<DynamicImage, Error = String>>> = Vec::new();
+    fn create_renderers(&self, tiles: &[Tile<DynamicImage>]) -> RendererResult {
+        let mut renderers: RendererVec = Vec::new();
 
         // Add SDL2 renderer if requested
         #[cfg(feature = "visual")]

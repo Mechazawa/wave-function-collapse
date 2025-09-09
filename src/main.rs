@@ -30,7 +30,7 @@ fn main() {
     )
     .unwrap();
 
-    match opt.to_app_config() {
+    match opt.into_app_config() {
         Ok(config) => {
             let app = WfcApp::new(config);
             if let Err(e) = app.run() {

@@ -136,7 +136,7 @@ pub struct Opt {
 }
 
 impl Opt {
-    pub fn to_app_config(self) -> Result<AppConfig, &'static str> {
+    pub fn into_app_config(self) -> Result<AppConfig, &'static str> {
         Ok(AppConfig {
             input: self.input.ok_or("Input is required")?,
             input_size: self.input_size.ok_or("Input size is required")?,
