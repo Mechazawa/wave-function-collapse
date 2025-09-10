@@ -45,6 +45,7 @@ pub struct TileConfig {
 
 #[cfg(feature = "image-input")]
 impl Tile<DynamicImage> {
+    #[must_use]
     pub fn from_config(configs: &[TileConfig]) -> Vec<Self> {
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
@@ -86,6 +87,7 @@ impl Tile<DynamicImage> {
         output
     }
 
+    #[must_use]
     pub fn from_image(image: &DynamicImage, tile_size: &Size) -> Vec<Self> {
         let (image_width, image_height) = image.dimensions();
         let grid_width = image_width as usize / tile_size.width;
@@ -144,6 +146,7 @@ impl Tile<DynamicImage> {
         output
     }
 
+    #[must_use]
     pub fn new_image_tile(image: DynamicImage) -> Self {
         let mut hasher = DefaultHasher::new();
 
@@ -160,6 +163,7 @@ impl Tile<DynamicImage> {
 }
 
 impl<T> Tile<T> {
+    #[must_use]
     pub fn new(id: u64, value: T) -> Self {
         Self {
             id,

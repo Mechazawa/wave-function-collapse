@@ -46,6 +46,7 @@ impl<T> SuperState<T>
 where
     T: Collapsable,
 {
+    #[must_use]
     pub fn new(possible: Vec<Arc<T>>) -> Self {
         let base_entropy = possible.len();
 
@@ -56,15 +57,18 @@ where
         }
     }
 
+    #[must_use]
     pub fn base_entropy(&self) -> usize {
         self.base_entropy
     }
 
+    #[must_use]
     pub fn collapsing(&self) -> bool {
         self.base_entropy != self.entropy()
     }
 
     #[inline]
+    #[must_use]
     pub fn entropy(&self) -> usize {
         self.entropy
     }
@@ -74,6 +78,7 @@ where
         self.entropy = self.possible.len();
     }
 
+    #[must_use]
     pub fn collapsed(&self) -> Option<&T> {
         match self.entropy {
             1 => Some(self.possible.first()?.as_ref()),

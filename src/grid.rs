@@ -11,6 +11,7 @@ pub enum Direction {
 }
 
 impl Direction {
+    #[must_use]
     pub fn invert(&self) -> Self {
         match self {
             Direction::Up => Direction::Down,
@@ -35,20 +36,21 @@ impl FromStr for Size {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (raw_width, raw_height) = s.split_once('x').ok_or(format!("invalid format: {}", s))?;
+        let (raw_width, raw_height) = s.split_once('x').ok_or(format!("invalid format: {s}"))?;
 
         let width = raw_width
             .parse::<usize>()
-            .map_err(|_| format!("invalid width: {}", raw_width))?;
+            .map_err(|_| format!("invalid width: {raw_width}"))?;
         let height = raw_height
             .parse::<usize>()
-            .map_err(|_| format!("invalid height: {}", raw_height))?;
+            .map_err(|_| format!("invalid height: {raw_height}"))?;
 
         Ok(Size { width, height })
     }
 }
 
 impl Size {
+    #[must_use]
     pub fn uniform(size: usize) -> Self {
         Self {
             width: size,
@@ -101,10 +103,12 @@ where
         }
     }
 
+    #[must_use]
     pub fn size(&self) -> usize {
         self.width * self.height
     }
 
+    #[must_use]
     pub fn iter(&self) -> GridIter<'_, T> {
         GridIter {
             grid: self,
@@ -114,6 +118,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
         let index = x + (y * self.width);
 
@@ -136,9 +141,11 @@ where
         }
     }
 
+    /// # Errors
+    /// Returns an error if the coordinates are out of bounds.
     pub fn set(&mut self, x: usize, y: usize, value: T) -> Result<(), &'static str> {
         if x >= self.width || y >= self.height {
-            Err("Cell out of range")?
+            Err("Cell out of range")?;
         }
 
         let index = x + (y * self.width);
@@ -148,6 +155,7 @@ where
         Ok(())
     }
 
+    #[must_use]
     pub fn get_neighbors(&self, x: usize, y: usize) -> Neighbors<Option<&T>> {
         enum_map! {
             Direction::Up => self.get_neighbor(x, y, Direction::Up),
@@ -157,6 +165,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn get_neighbor_positions(&self, x: usize, y: usize) -> Neighbors<Option<Position>> {
         enum_map! {
             Direction::Up => self.get_neighbor_position(x, y, Direction::Up),
@@ -166,6 +175,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn get_neighbor_position(
         &self,
         x: usize,
@@ -204,20 +214,26 @@ where
         }
     }
 
+    #[must_use]
     pub fn get_neighbor(&self, x: usize, y: usize, direction: Direction) -> Option<&T> {
         let (lx, ly) = self.get_neighbor_position(x, y, direction)?;
 
         self.get(lx, ly)
     }
 
+    #[must_use]
     pub fn width(&self) -> usize {
         self.width
     }
 
+    #[must_use]
     pub fn height(&self) -> usize {
         self.height
     }
 
+    /// # Panics
+    /// Panics if accessing out of bounds coordinates.
+    #[must_use]
     pub fn slice(&self, x: usize, y: usize, width: usize, height: usize) -> Grid<&T> {
         Grid::new(
             width.min(self.width() - x), 
@@ -226,6 +242,7 @@ where
         )
     }
 
+    #[must_use]
     pub fn chunked(&self, chunk_width: usize, chunk_height: usize) -> Vec<Grid<&T>> {
         let mut output = vec![];
 

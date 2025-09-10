@@ -37,6 +37,7 @@ impl<T> Wave<T>
 where
     T: Collapsable,
 {
+    #[must_use]
     pub fn new(grid: Grid<SuperState<T>>, seed: u64) -> Self {
         Self {
             stack: VecDeque::with_capacity(grid.size()),
@@ -187,13 +188,13 @@ where
         for (direction, (x, y)) in neighbor_positions {
             match self.data.get_mut(x, y).unwrap() {
                 None => {
-                    let mut neighbors = Neighbors::default();
-                    neighbors[direction.invert()] = possible_states.clone();
+                    let mut neighbors: Neighbors<Set<T::Identifier>> = Neighbors::default();
+                    neighbors[direction.invert()].clone_from(&possible_states);
                     self.data.set(x, y, Some(neighbors)).unwrap();
                     self.stack.push_back((x, y));
                 }
                 Some(neighbors) => {
-                    neighbors[direction.invert()] = possible_states.clone();
+                    neighbors[direction.invert()].clone_from(&possible_states);
                 }
             }
         }
@@ -202,7 +203,7 @@ where
     fn smart_rollback(&mut self) {
         let collapsed_count = self.grid.size() - self.remaining();
 
-        trace!("Collapsed: {}", collapsed_count);
+        trace!("Collapsed: {collapsed_count}");
 
         if collapsed_count <= self.last_rollback {
             self.rollback_penalty += 0.5;
@@ -217,6 +218,8 @@ where
             .filter(|((_, _), c)| *c == CollapseReason::Explicit)
             .count();
 
+        // Todo replace the rollback_penalty with a usize instead of using floats
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         if collapsed_count < self.rollback_penalty.ceil() as usize {
             warn!("Unable to solve, resetting...");
             for (x, y, cell) in &self.grid_base {
@@ -229,7 +232,10 @@ where
             self.rollback_penalty = 0.5;
             self.last_rollback = 0;
         } else {
-            self.rollback(self.rollback_penalty.ceil() as usize);
+            // Todo replace the rollback_penalty with a usize instead of using floats
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let rollback_amount = self.rollback_penalty.ceil() as usize;
+            self.rollback(rollback_amount);
 
             // tmp hack, shouldn't have to do this...
             self.stack.clear();
@@ -294,7 +300,7 @@ where
 
                 let neighbors = self.grid.get_neighbors(nx, ny).map(|_, v| match v {
                     None => Set::default(),
-                    Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
+                    Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect::<Set<_>>(),
                 });
 
                 base.tick(&neighbors);
@@ -316,8 +322,8 @@ where
             item.entropy() == 1
         });
 
-        let mut stack: Vec<Position> = Default::default();
-        let mut output: Vec<Vec<Position>> = Default::default();
+        let mut stack: Vec<Position> = Vec::default();
+        let mut output: Vec<Vec<Position>> = Vec::default();
 
         for bx in 0..board.width() {
             for by in 0..board.height() {
@@ -349,7 +355,7 @@ where
             }
         }
 
-        output.sort_by_key(|a| a.len());
+        output.sort_by_key(std::vec::Vec::len);
 
         output
     }
