@@ -5,7 +5,7 @@ use crate::grid::Size;
 use crate::superstate::Collapsable;
 use crate::wave::Set;
 
-use enum_map::enum_map;
+use enum_map::{enum_map, EnumMap};
 use log::debug;
 
 #[cfg(feature = "image-input")]
@@ -93,7 +93,7 @@ impl Tile<DynamicImage> {
         let grid_width = image_width as usize / tile_size.width;
         let grid_height = image_height as usize / tile_size.height;
 
-        let mut unique: FxHashMap<u64, Self> = Default::default();
+        let mut unique: FxHashMap<u64, Self> = FxHashMap::default();
 
         debug!("Input grid: {grid_width}x{grid_height}");
 
@@ -168,7 +168,7 @@ impl<T> Tile<T> {
         Self {
             id,
             value: Box::new(value),
-            neighbors: Default::default(),
+            neighbors: EnumMap::default(),
             weight: 1,
         }
     }

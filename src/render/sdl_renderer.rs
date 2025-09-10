@@ -27,7 +27,7 @@ pub struct SdlRenderer {
     frame_counter: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SdlConfig {
     pub window_size: Size,
     pub vsync: bool,
@@ -37,7 +37,7 @@ pub struct SdlConfig {
 }
 
 impl SdlRenderer {
-    pub fn new(config: SdlConfig) -> Result<Self, String> {
+    pub fn new(config: &SdlConfig) -> Result<Self, String> {
         let context = sdl2::init()?;
         let video = context.video()?;
 

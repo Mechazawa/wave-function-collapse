@@ -42,7 +42,7 @@ where
         Self {
             stack: VecDeque::with_capacity(grid.size()),
             collapsed: Vec::with_capacity(grid.size()),
-            data: Grid::new(grid.width(), grid.height(), &mut |_, _| Default::default()),
+            data: Grid::new(grid.width(), grid.height(), &mut |_, _| Option::default()),
             grid_base: grid.clone(),
             grid,
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
@@ -90,7 +90,7 @@ where
         if self.data.get(x, y).unwrap().is_none() {
             let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
                 None => Set::default(),
-                Some(neighbor) => Set::from_iter(neighbor.possible.iter().map(|x| x.get_id())),
+                Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
             });
 
             self.data.set(x, y, Some(data)).unwrap();

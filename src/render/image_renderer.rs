@@ -23,8 +23,7 @@ impl ImageRenderer {
         }
     }
 
-
-    fn create_final_image_from_wfc(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), String> {
+    fn create_final_image_from_wfc(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) {
         let mut canvas = RgbaImage::new(
             self.grid_size.0 as u32 * self.tile_size.0,
             self.grid_size.1 as u32 * self.tile_size.1,
@@ -42,7 +41,6 @@ impl ImageRenderer {
         }
 
         self.final_image = Some(canvas);
-        Ok(())
     }
 }
 
@@ -63,13 +61,13 @@ impl Renderer<DynamicImage> for ImageRenderer {
 
 
     fn finalize(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), Self::Error> {
-        self.create_final_image_from_wfc(wfc)?;
+        self.create_final_image_from_wfc(wfc);
         
         if let Some(image) = &self.final_image {
             image.save(&self.output_path)
                 .map_err(|e| format!("Failed to save image: {e}"))?;
         }
-        
+
         Ok(())
     }
 
