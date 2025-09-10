@@ -110,7 +110,7 @@ where
         }
 
         if cell.entropy() == 0 {
-            self.smart_rollback();
+            self.smart_rollback_with_contradiction((x, y));
         } else if old_entropy != cell.entropy() {
             if cell.collapsing()
                 && self
@@ -314,6 +314,107 @@ where
                     self.rollback_propegate(nx, ny, Some(direction.invert()));
                 }
             }
+        }
+    }
+
+    fn analyze_contradiction(&self, contradiction_pos: Position) -> Option<Position> {
+        let (cx, cy) = contradiction_pos;
+        
+        // Find the most recently collapsed cell that could influence this contradiction
+        // We look for the latest explicit collapse among neighbors and their neighbors
+        let mut best_candidate: Option<(Position, usize)> = None;
+        let mut search_radius = 1;
+        
+        // Expand search radius until we find a candidate or reach reasonable limit
+        while search_radius <= 3 && best_candidate.is_none() {
+            for dx in -(search_radius as isize)..=(search_radius as isize) {
+                for dy in -(search_radius as isize)..=(search_radius as isize) {
+                    if dx == 0 && dy == 0 { continue; }
+                    
+                    let nx = cx as isize + dx;
+                    let ny = cy as isize + dy;
+                    
+                    if nx >= 0 && ny >= 0 && 
+                       (nx as usize) < self.grid.width() && 
+                       (ny as usize) < self.grid.height() {
+                        
+                        let pos = (nx as usize, ny as usize);
+                        
+                        // Find this position in the collapsed history
+                        if let Some(index) = self.collapsed.iter().rposition(|(p, reason)| 
+                            *p == pos && *reason == CollapseReason::Explicit) {
+                            
+                            match best_candidate {
+                                None => best_candidate = Some((pos, index)),
+                                Some((_, best_index)) if index > best_index => {
+                                    best_candidate = Some((pos, index));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+            search_radius += 1;
+        }
+        
+        best_candidate.map(|(pos, _)| pos)
+    }
+
+    fn conflict_driven_rollback(&mut self, contradiction_pos: Position) {
+        if let Some(culprit_pos) = self.analyze_contradiction(contradiction_pos) {
+            // Find how many explicit collapses to roll back to reach the culprit
+            let mut rollback_count = 0;
+            let mut found_culprit = false;
+            
+            for ((x, y), reason) in self.collapsed.iter().rev() {
+                if *reason == CollapseReason::Explicit {
+                    rollback_count += 1;
+                    if (*x, *y) == culprit_pos {
+                        found_culprit = true;
+                        break;
+                    }
+                }
+            }
+            
+            if found_culprit {
+                trace!("Conflict-driven rollback: {} steps to reach culprit at {:?}", 
+                       rollback_count, culprit_pos);
+                self.rollback(rollback_count);
+            } else {
+                // Fallback to smart rollback if we can't find the culprit
+                warn!("Could not find culprit for contradiction at {:?}, using fallback", 
+                      contradiction_pos);
+                self.smart_rollback();
+            }
+        } else {
+            // No nearby collapsed cells found, use smart rollback
+            warn!("No collapsed neighbors found for contradiction at {:?}, using fallback", 
+                  contradiction_pos);
+            self.smart_rollback();
+        }
+        
+        // Clear the stack and rebuild it (same as original smart_rollback)
+        self.stack.clear();
+        for (x, y, _) in &self.grid {
+            self.data.set(x, y, None).unwrap();
+            self.stack.push_back((x, y));
+        }
+    }
+
+    fn smart_rollback_with_contradiction(&mut self, contradiction_pos: Position) {
+        let collapsed_count = self.grid.size() - self.remaining();
+        trace!("Contradiction at {:?}, collapsed: {}", contradiction_pos, collapsed_count);
+        
+        // Use conflict-driven approach first
+        self.conflict_driven_rollback(contradiction_pos);
+        
+        // Update penalty tracking for future fallbacks
+        if collapsed_count <= self.last_rollback {
+            self.rollback_penalty += 0.5;
+        } else {
+            self.last_rollback = collapsed_count;
+            self.rollback_penalty = 0.5;
         }
     }
 
