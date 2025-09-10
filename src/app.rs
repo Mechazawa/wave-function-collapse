@@ -170,8 +170,9 @@ impl WfcApp {
                     render_every_step: self.config.renderer.slow,
                 };
 
-                let sdl_renderer = SdlRenderer::new(sdl_config)?;
-                renderers.push(Box::new(sdl_renderer));
+                if let Ok(sdl_renderer) = SdlRenderer::new(&sdl_config) {
+                    renderers.push(Box::new(sdl_renderer));
+                }
             }
         }
 
