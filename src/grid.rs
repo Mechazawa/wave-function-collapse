@@ -12,6 +12,7 @@ pub enum Direction {
 
 impl Direction {
     #[must_use]
+    #[inline]
     pub fn invert(&self) -> Self {
         match self {
             Direction::Up => Direction::Down,
