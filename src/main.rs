@@ -34,12 +34,12 @@ fn main() {
         Ok(config) => {
             let app = WfcApp::new(config);
             if let Err(e) = app.run() {
-                eprintln!("Error: {}", e);
+                eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
         Err(e) => {
-            eprintln!("Configuration error: {}", e);
+            eprintln!("Configuration error: {e}");
             std::process::exit(1);
         }
     }

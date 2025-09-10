@@ -24,7 +24,7 @@ mod image_imports {
 }
 
 #[cfg(feature = "image-input")]
-use image_imports::*;
+use image_imports::{Deserialize, PathBuf, Hasher, DynamicImage, ImageReader, Pixel, GenericImageView, FxHashMap, ImageBuffer, Entry, DefaultHasher, ToPrimitive};
 
 #[derive(Debug, Clone)]
 pub struct Tile<T> {
@@ -153,7 +153,7 @@ impl Tile<DynamicImage> {
         for pixel in image.pixels() {
             for channel in pixel.2.channels() {
                 if let Some(value) = channel.to_u8() {
-                    hasher.write_u8(value)
+                    hasher.write_u8(value);
                 }
             }
         }

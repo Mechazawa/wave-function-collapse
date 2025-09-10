@@ -74,7 +74,7 @@ impl WfcApp {
             { OsRng.gen() }
         };
 
-        info!("Using seed: {}", seed);
+        info!("Using seed: {seed}");
 
         let mut wfc = Wave::new(grid, seed);
 
@@ -130,7 +130,7 @@ impl WfcApp {
         // Hold visualization if requested
         #[cfg(feature = "visual")]
         if let Some(delay) = self.config.renderer.hold {
-            info!("Waiting for {} seconds", delay);
+            info!("Waiting for {delay} seconds");
             std::thread::sleep(Duration::from_secs_f32(delay));
         }
 

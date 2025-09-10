@@ -17,10 +17,10 @@ fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
 
 fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
     let path = PathBuf::from(s);
-    let file = File::open(path).map_err(|e| format!("Failed to open config file: {}", e))?;
+    let file = File::open(path).map_err(|e| format!("Failed to open config file: {e}"))?;
     let reader = BufReader::new(file);
     let configs = serde_json::from_reader(reader)
-        .map_err(|e| format!("Failed to parse config file: {}", e))?;
+        .map_err(|e| format!("Failed to parse config file: {e}"))?;
     Ok(configs)
 }
 

@@ -13,6 +13,7 @@ pub struct ImageRenderer {
 }
 
 impl ImageRenderer {
+    #[must_use]
     pub fn new(output_path: PathBuf) -> Self {
         Self {
             output_path,
@@ -34,8 +35,8 @@ impl ImageRenderer {
                 image::imageops::overlay(
                     &mut canvas,
                     tile.value.as_ref(),
-                    x as i64 * self.tile_size.0 as i64,
-                    y as i64 * self.tile_size.1 as i64,
+                    x as i64 * i64::from(self.tile_size.0),
+                    y as i64 * i64::from(self.tile_size.1),
                 );
             }
         }
@@ -66,7 +67,7 @@ impl Renderer<DynamicImage> for ImageRenderer {
         
         if let Some(image) = &self.final_image {
             image.save(&self.output_path)
-                .map_err(|e| format!("Failed to save image: {}", e))?;
+                .map_err(|e| format!("Failed to save image: {e}"))?;
         }
         
         Ok(())

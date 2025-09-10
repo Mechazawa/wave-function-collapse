@@ -51,10 +51,12 @@ where
         }
     }
 
+    #[must_use]
     pub fn done(&self) -> bool {
         self.remaining() == 0
     }
 
+    #[must_use]
     pub fn remaining(&self) -> usize {
         self.grid.size() - self.collapsed.len()
     }
@@ -141,7 +143,7 @@ where
         let mut candidates = Vec::new();
         
         for &(x, y) in first_area {
-            let entropy = self.grid.get(x, y).map_or(1, |cell| cell.entropy());
+            let entropy = self.grid.get(x, y).map_or(1, SuperState::entropy);
             
             if entropy <= 1 {
                 continue; // Skip collapsed/invalid cells
@@ -355,7 +357,7 @@ where
             }
         }
 
-        output.sort_by_key(std::vec::Vec::len);
+        output.sort_by_key(Vec::len);
 
         output
     }
