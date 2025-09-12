@@ -27,9 +27,14 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo dpkg --add-architecture arm64
-        sudo apt-get update
-        sudo apt-get install -y libsdl2-dev:${{ matrix.arch }} libsdl2-image-dev:${{ matrix.arch }}
+        if [ "${{ matrix.arch }}" = "aarch64" ]; then
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libsdl2-dev:arm64 libsdl2-image-dev:arm64
+        else
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libsdl2-image-dev
+        fi
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
