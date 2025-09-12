@@ -23,7 +23,7 @@ jobs:
             toolchain: stable
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Install dependencies
       run: |
@@ -32,11 +32,10 @@ jobs:
         sudo apt-get install -y libsdl2-dev:${{ matrix.arch }} libsdl2-image-dev:${{ matrix.arch }}
 
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
           toolchain: ${{ matrix.toolchain }}
-          override: true
-          target: ${{ matrix.target }}
+          targets: ${{ matrix.target }}
 
     - name: Install cross
       run: cargo install cross
@@ -45,7 +44,7 @@ jobs:
       run: cross build --target ${{ matrix.target }}
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.target }}
         path: target/${{ matrix.target }}/debug/*
