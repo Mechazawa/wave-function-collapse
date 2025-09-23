@@ -69,7 +69,7 @@ where
             worked = true;
         }
 
-        worked || self.maybe_collapse().is_none()
+        worked || self.maybe_collapse().is_some()
     }
 
     pub fn tick_once(&mut self) -> Option<Position> {
