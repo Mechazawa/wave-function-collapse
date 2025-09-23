@@ -14,7 +14,6 @@ use crate::render::image_renderer::ImageRenderer;
 use image::{DynamicImage, GenericImageView};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{info, warn};
-use rand::rngs::OsRng;
 use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
@@ -69,12 +68,12 @@ impl WfcApp {
         let seed = {
             #[cfg(not(feature = "threaded"))]
             {
-                self.config.seed.unwrap_or_else(|| OsRng.gen())
+                self.config.seed.unwrap_or_else(|| rand::rng().random())
             }
 
             #[cfg(feature = "threaded")]
             {
-                OsRng.gen()
+                rand::rng().random()
             }
         };
 

@@ -11,7 +11,7 @@ use log::debug;
 #[cfg(feature = "image-input")]
 mod image_imports {
     pub use fxhash::FxHashMap;
-    pub use image::io::Reader as ImageReader;
+    pub use image::ImageReader;
     pub use image::DynamicImage;
     pub use image::GenericImageView;
     pub use image::ImageBuffer;

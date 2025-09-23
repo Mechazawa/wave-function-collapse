@@ -1,6 +1,6 @@
 use crate::grid::Size;
 use crate::tile::TileConfig;
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use image::{DynamicImage, ImageError};
 use std::fs::File;
 use std::io::BufReader;

@@ -2,7 +2,7 @@ use fxhash::FxHashSet;
 use std::collections::VecDeque;
 
 use log::{trace, warn};
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
