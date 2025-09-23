@@ -1,13 +1,13 @@
 use crate::grid::Size;
 use crate::tile::TileConfig;
-use image::{ImageError, DynamicImage};
 use image::io::Reader as ImageReader;
+use image::{DynamicImage, ImageError};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use structopt::clap::Shell;
 use structopt::StructOpt;
 use structopt_flags::QuietVerbose;
-use structopt::clap::Shell;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);
@@ -19,8 +19,8 @@ fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
     let path = PathBuf::from(s);
     let file = File::open(path).map_err(|e| format!("Failed to open config file: {e}"))?;
     let reader = BufReader::new(file);
-    let configs = serde_json::from_reader(reader)
-        .map_err(|e| format!("Failed to parse config file: {e}"))?;
+    let configs =
+        serde_json::from_reader(reader).map_err(|e| format!("Failed to parse config file: {e}"))?;
     Ok(configs)
 }
 
@@ -88,10 +88,7 @@ pub struct Opt {
     )]
     input_size: Option<usize>,
 
-    #[structopt(
-        parse(from_os_str),
-        help = "Output image",
-    )]
+    #[structopt(parse(from_os_str), help = "Output image")]
     output: Option<PathBuf>,
 
     #[structopt(

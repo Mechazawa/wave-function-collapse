@@ -322,9 +322,7 @@ where
 
     fn collapsable_areas(&self) -> Vec<Vec<Position>> {
         let mut board = Grid::<bool>::new(self.grid.width(), self.grid.height(), &mut |x, y| {
-            self.grid
-                .get(x, y)
-                .is_some_and(|cell| cell.entropy() == 1)
+            self.grid.get(x, y).is_some_and(|cell| cell.entropy() == 1)
         });
 
         let mut stack: Vec<Position> = Vec::default();

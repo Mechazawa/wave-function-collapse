@@ -1,4 +1,3 @@
-
 use std::sync::Arc;
 use wave_function_collapse::{
     grid::{Direction, Grid},

@@ -1,15 +1,15 @@
 use super::Renderer;
-use crate::tile::Tile;
 use crate::grid::Size;
 use crate::superstate::Collapsable;
+use crate::tile::Tile;
 
 use image::{DynamicImage, GenericImageView};
-use sdl2::video::FullscreenType;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture};
+use sdl2::video::FullscreenType;
 use sdl2::video::Window;
 use sdl2::EventPump;
 use std::collections::HashMap;
@@ -83,7 +83,7 @@ impl SdlRenderer {
 
     fn create_textures(&mut self, tiles: &[Tile<DynamicImage>]) -> Result<(), String> {
         let texture_creator = self.canvas.texture_creator();
-        
+
         for tile in tiles {
             if self.textures.contains_key(&tile.get_id()) {
                 continue;
@@ -104,7 +104,7 @@ impl SdlRenderer {
 
             self.textures.insert(tile.get_id(), texture);
         }
-        
+
         Ok(())
     }
 
@@ -123,8 +123,10 @@ impl SdlRenderer {
         }
     }
 
-
-    fn render_grid_from_wfc(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), String> {
+    fn render_grid_from_wfc(
+        &mut self,
+        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+    ) -> Result<(), String> {
         use sdl2::render::BlendMode;
 
         let (tile_width, tile_height) = self.tile_size;
@@ -141,12 +143,16 @@ impl SdlRenderer {
             );
 
             if let Some(tile) = cell.collapsed() {
-                let texture = self.textures.get(&tile.get_id())
+                let texture = self
+                    .textures
+                    .get(&tile.get_id())
                     .ok_or("Missing texture for tile")?;
 
                 self.canvas.set_draw_color(Color::GRAY);
                 self.canvas.fill_rect(rect).map_err(|e| e.to_string())?;
-                self.canvas.copy(texture, None, Some(rect)).map_err(|e| e.to_string())?;
+                self.canvas
+                    .copy(texture, None, Some(rect))
+                    .map_err(|e| e.to_string())?;
             } else {
                 let mut color = if cell.entropy() > 0 {
                     let ratio = cell.entropy() as f32 / cell.base_entropy() as f32;
@@ -176,7 +182,11 @@ impl SdlRenderer {
 impl Renderer<DynamicImage> for SdlRenderer {
     type Error = String;
 
-    fn initialize(&mut self, tiles: &[Tile<DynamicImage>], output_size: (usize, usize)) -> Result<(), Self::Error> {
+    fn initialize(
+        &mut self,
+        tiles: &[Tile<DynamicImage>],
+        output_size: (usize, usize),
+    ) -> Result<(), Self::Error> {
         if tiles.is_empty() {
             return Err("No tiles provided".to_string());
         }
@@ -184,18 +194,20 @@ impl Renderer<DynamicImage> for SdlRenderer {
         let (tile_width, tile_height) = tiles[0].value.as_ref().dimensions();
         self.tile_size = (tile_width, tile_height);
         self.grid_size = output_size;
-        
+
         self.create_textures(tiles)?;
-        
+
         Ok(())
     }
-
 
     fn should_quit(&mut self) -> bool {
         self.should_quit
     }
 
-    fn update(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), Self::Error> {
+    fn update(
+        &mut self,
+        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+    ) -> Result<(), Self::Error> {
         self.handle_events();
 
         if self.should_quit {
@@ -203,7 +215,7 @@ impl Renderer<DynamicImage> for SdlRenderer {
         }
 
         self.frame_counter += 1;
-        
+
         // Render every frame if render_every_step is true (slow mode)
         // Otherwise render every 10 frames to show progress without being too slow
         if self.render_every_step || (self.frame_counter % 10 == 0) {
@@ -212,9 +224,11 @@ impl Renderer<DynamicImage> for SdlRenderer {
         Ok(())
     }
 
-    fn finalize(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), Self::Error> {
+    fn finalize(
+        &mut self,
+        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+    ) -> Result<(), Self::Error> {
         self.render_grid_from_wfc(wfc)?;
         Ok(())
     }
-
 }

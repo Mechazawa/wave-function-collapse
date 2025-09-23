@@ -15,20 +15,23 @@ where
     type Error;
 
     /// Initialize the renderer with configuration
-    fn initialize(&mut self, tiles: &[Tile<T>], output_size: (usize, usize)) -> Result<(), Self::Error>;
-    
+    fn initialize(
+        &mut self,
+        tiles: &[Tile<T>],
+        output_size: (usize, usize),
+    ) -> Result<(), Self::Error>;
+
     /// Update renderer with current WFC state (for visual renderers)
     fn update(&mut self, wfc: &Wave<Tile<T>>) -> Result<(), Self::Error> {
         let _ = wfc;
         Ok(())
     }
-    
+
     /// Check if the user wants to quit (for interactive renderers)
     fn should_quit(&mut self) -> bool {
         false
     }
-    
+
     /// Finalize rendering with final state (e.g., save to file, display final result)
     fn finalize(&mut self, wfc: &Wave<Tile<T>>) -> Result<(), Self::Error>;
 }
-

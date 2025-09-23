@@ -6,10 +6,8 @@ use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]
 use {
-    rayon::prelude::IntoParallelRefIterator,
+    lazy_static::lazy_static, log::trace, rayon::prelude::IntoParallelRefIterator,
     rayon::prelude::ParallelIterator,
-    log::trace,
-    lazy_static::lazy_static,
 };
 
 #[cfg(feature = "threaded")]
@@ -21,7 +19,7 @@ lazy_static! {
 
         trace!("Min workload size before threading: {min_len}");
 
-        min_len        
+        min_len
     };
 }
 

@@ -1,6 +1,6 @@
 use core::str::FromStr;
-use std::mem;
 use enum_map::{enum_map, Enum, EnumMap};
+use std::mem;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]
 pub enum Direction {
@@ -237,9 +237,9 @@ where
     #[must_use]
     pub fn slice(&self, x: usize, y: usize, width: usize, height: usize) -> Grid<&T> {
         Grid::new(
-            width.min(self.width() - x), 
-            height.min(self.height() - y), 
-            &mut |x, y| self.get(x, y).unwrap()
+            width.min(self.width() - x),
+            height.min(self.height() - y),
+            &mut |x, y| self.get(x, y).unwrap(),
         )
     }
 
@@ -255,9 +255,9 @@ where
 
         output
     }
-    
+
     /// Efficiently reset all grid cells to default value without reallocating
-    pub fn reset_to_default(&mut self) 
+    pub fn reset_to_default(&mut self)
     where
         T: Default,
     {

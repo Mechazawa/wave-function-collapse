@@ -23,7 +23,10 @@ impl ImageRenderer {
         }
     }
 
-    fn create_final_image_from_wfc(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) {
+    fn create_final_image_from_wfc(
+        &mut self,
+        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+    ) {
         let mut canvas = RgbaImage::new(
             self.grid_size.0 as u32 * self.tile_size.0,
             self.grid_size.1 as u32 * self.tile_size.1,
@@ -47,7 +50,11 @@ impl ImageRenderer {
 impl Renderer<DynamicImage> for ImageRenderer {
     type Error = String;
 
-    fn initialize(&mut self, tiles: &[Tile<DynamicImage>], output_size: (usize, usize)) -> Result<(), Self::Error> {
+    fn initialize(
+        &mut self,
+        tiles: &[Tile<DynamicImage>],
+        output_size: (usize, usize),
+    ) -> Result<(), Self::Error> {
         if tiles.is_empty() {
             return Err("No tiles provided".to_string());
         }
@@ -55,21 +62,22 @@ impl Renderer<DynamicImage> for ImageRenderer {
         let (tile_width, tile_height) = tiles[0].value.as_ref().dimensions();
         self.tile_size = (tile_width, tile_height);
         self.grid_size = output_size;
-        
+
         Ok(())
     }
 
-
-    fn finalize(&mut self, wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>) -> Result<(), Self::Error> {
+    fn finalize(
+        &mut self,
+        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+    ) -> Result<(), Self::Error> {
         self.create_final_image_from_wfc(wfc);
-        
+
         if let Some(image) = &self.final_image {
-            image.save(&self.output_path)
+            image
+                .save(&self.output_path)
                 .map_err(|e| format!("Failed to save image: {e}"))?;
         }
 
         Ok(())
     }
-
 }
-

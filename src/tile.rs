@@ -10,6 +10,7 @@ use log::debug;
 
 #[cfg(feature = "image-input")]
 mod image_imports {
+    pub use fxhash::FxHashMap;
     pub use image::io::Reader as ImageReader;
     pub use image::DynamicImage;
     pub use image::GenericImageView;
@@ -18,13 +19,15 @@ mod image_imports {
     pub use num_traits::cast::ToPrimitive;
     pub use serde::Deserialize;
     pub use std::collections::hash_map::{DefaultHasher, Entry};
-    pub use fxhash::FxHashMap;
     pub use std::hash::Hasher;
     pub use std::path::PathBuf;
 }
 
 #[cfg(feature = "image-input")]
-use image_imports::{Deserialize, PathBuf, Hasher, DynamicImage, ImageReader, Pixel, GenericImageView, FxHashMap, ImageBuffer, Entry, DefaultHasher, ToPrimitive};
+use image_imports::{
+    DefaultHasher, Deserialize, DynamicImage, Entry, FxHashMap, GenericImageView, Hasher,
+    ImageBuffer, ImageReader, PathBuf, Pixel, ToPrimitive,
+};
 
 #[derive(Debug, Clone)]
 pub struct Tile<T> {

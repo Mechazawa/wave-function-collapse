@@ -6,7 +6,7 @@ use crate::tile::Tile;
 use crate::wave::Wave;
 
 #[cfg(feature = "visual")]
-use crate::render::sdl_renderer::{SdlRenderer, SdlConfig};
+use crate::render::sdl_renderer::{SdlConfig, SdlRenderer};
 
 #[cfg(feature = "image-output")]
 use crate::render::image_renderer::ImageRenderer;
@@ -68,10 +68,14 @@ impl WfcApp {
 
         let seed = {
             #[cfg(not(feature = "threaded"))]
-            { self.config.seed.unwrap_or_else(|| OsRng.gen()) }
+            {
+                self.config.seed.unwrap_or_else(|| OsRng.gen())
+            }
 
             #[cfg(feature = "threaded")]
-            { OsRng.gen() }
+            {
+                OsRng.gen()
+            }
         };
 
         info!("Using seed: {seed}");
@@ -83,7 +87,13 @@ impl WfcApp {
 
         // Initialize all renderers
         for renderer in &mut renderers {
-            renderer.initialize(&tiles, (self.config.output_size.width, self.config.output_size.height))?;
+            renderer.initialize(
+                &tiles,
+                (
+                    self.config.output_size.width,
+                    self.config.output_size.height,
+                ),
+            )?;
         }
 
         // Progress bar
@@ -152,11 +162,11 @@ impl WfcApp {
             if let Some(first_tile) = tiles.first() {
                 // Get the actual tile dimensions
                 let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
-                
+
                 // Calculate window size based on actual tile size
                 let window_width = self.config.output_size.width * tile_width as usize;
                 let window_height = self.config.output_size.height * tile_height as usize;
-                
+
                 let window_size = Size {
                     width: window_width,
                     height: window_height,
@@ -185,5 +195,4 @@ impl WfcApp {
 
         Ok(renderers)
     }
-
 }

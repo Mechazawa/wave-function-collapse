@@ -8,12 +8,12 @@ mod wave;
 
 #[cfg(feature = "image-input")]
 fn main() {
-    use cli::Opt;
     use app::WfcApp;
-    use structopt::StructOpt;
-    use structopt_flags::LogLevel;
+    use cli::Opt;
     use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
     use std::io;
+    use structopt::StructOpt;
+    use structopt_flags::LogLevel;
 
     let opt: Opt = Opt::from_args();
 

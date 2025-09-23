@@ -1,13 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use std::sync::Arc;
 use rand::SeedableRng;
+use std::sync::Arc;
 
-use wave_function_collapse::{
-    grid::Grid,
-    superstate::SuperState,
-    tile::Tile,
-    wave::Wave,
-};
+use wave_function_collapse::{grid::Grid, superstate::SuperState, tile::Tile, wave::Wave};
 
 #[cfg(feature = "image")]
 use image::DynamicImage;
@@ -20,15 +15,19 @@ fn create_test_tiles() -> Vec<Tile<u32>> {
     let mut tiles = Vec::with_capacity(16);
     for i in 0..16 {
         let mut tile = Tile::new(i, i as u32);
-        
+
         // Add some neighbor relationships for realistic constraints
         for neighbor_id in 0..4 {
-            tile.neighbors[wave_function_collapse::grid::Direction::Up].insert((i + neighbor_id) % 16);
-            tile.neighbors[wave_function_collapse::grid::Direction::Right].insert((i + neighbor_id + 1) % 16);
-            tile.neighbors[wave_function_collapse::grid::Direction::Down].insert((i + neighbor_id + 2) % 16);
-            tile.neighbors[wave_function_collapse::grid::Direction::Left].insert((i + neighbor_id + 3) % 16);
+            tile.neighbors[wave_function_collapse::grid::Direction::Up]
+                .insert((i + neighbor_id) % 16);
+            tile.neighbors[wave_function_collapse::grid::Direction::Right]
+                .insert((i + neighbor_id + 1) % 16);
+            tile.neighbors[wave_function_collapse::grid::Direction::Down]
+                .insert((i + neighbor_id + 2) % 16);
+            tile.neighbors[wave_function_collapse::grid::Direction::Left]
+                .insert((i + neighbor_id + 3) % 16);
         }
-        
+
         tile.weight = ((i % 4) + 1) as usize * 10; // Varied weights for realistic collapse behavior
         tiles.push(tile);
     }
@@ -46,19 +45,21 @@ fn create_partially_collapsed_wave(size: usize, collapse_ratio: f32) -> Wave<Til
     let mut wave = create_test_wave(size);
     let total_cells = size * size;
     let cells_to_collapse = (total_cells as f32 * collapse_ratio) as usize;
-    
+
     // Collapse some cells to create a realistic intermediate state
     for _ in 0..cells_to_collapse {
-        if wave.done() { break; }
+        if wave.done() {
+            break;
+        }
         wave.tick_once();
     }
-    
+
     wave
 }
 
 fn bench_maybe_collapse(c: &mut Criterion) {
     let mut group = c.benchmark_group("maybe_collapse");
-    
+
     for size in [10, 20, 50].iter() {
         group.bench_with_input(format!("size_{}", size), size, |b, &size| {
             b.iter_batched(
@@ -68,16 +69,16 @@ fn bench_maybe_collapse(c: &mut Criterion) {
             );
         });
     }
-    
+
     group.finish();
 }
 
 fn bench_superstate_tick(c: &mut Criterion) {
     let mut group = c.benchmark_group("superstate_tick");
-    
+
     let tiles = create_test_tiles();
     let neighbors = wave_function_collapse::grid::Neighbors::default(); // Empty neighbors for consistent timing
-    
+
     group.bench_function("tick_many_possibilities", |b| {
         b.iter_batched(
             || SuperState::new(tiles.iter().cloned().map(Arc::new).collect()),
@@ -88,15 +89,15 @@ fn bench_superstate_tick(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
 fn bench_superstate_collapse(c: &mut Criterion) {
     let mut group = c.benchmark_group("superstate_collapse");
-    
+
     let tiles = create_test_tiles();
-    
+
     group.bench_function("collapse_weighted", |b| {
         b.iter_batched(
             || {
@@ -111,20 +112,18 @@ fn bench_superstate_collapse(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
 fn bench_grid_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("grid_operations");
-    
+
     for size in [25, 50, 100].iter() {
         group.bench_with_input(format!("grid_creation_{}", size), size, |b, &size| {
-            b.iter(|| {
-                black_box(Grid::new(size, size, &mut |x, y| x + y))
-            });
+            b.iter(|| black_box(Grid::new(size, size, &mut |x, y| x + y)));
         });
-        
+
         group.bench_with_input(format!("grid_neighbors_{}", size), size, |b, &size| {
             let grid = Grid::new(size, size, &mut |x, y| x + y);
             b.iter(|| {
@@ -136,37 +135,35 @@ fn bench_grid_operations(c: &mut Criterion) {
             });
         });
     }
-    
+
     group.finish();
 }
 
 #[cfg(feature = "image")]
 fn bench_tile_from_image(c: &mut Criterion) {
-    use wave_function_collapse::grid::Size;
     use image::{DynamicImage, RgbaImage};
-    
+    use wave_function_collapse::grid::Size;
+
     let mut group = c.benchmark_group("tile_from_image");
-    
+
     // Create test images of various sizes
-    for (name, img_size, tile_size) in [
-        ("small", 64, 8),
-        ("medium", 128, 16),
-        ("large", 256, 32),
-    ].iter() {
+    for (name, img_size, tile_size) in
+        [("small", 64, 8), ("medium", 128, 16), ("large", 256, 32)].iter()
+    {
         let image = DynamicImage::ImageRgba8(RgbaImage::new(*img_size, *img_size));
         let size = Size::uniform(*tile_size);
-        
+
         group.bench_with_input(*name, &(image, size), |b, (img, tile_size)| {
             b.iter(|| black_box(Tile::<DynamicImage>::from_image(img, tile_size)));
         });
     }
-    
+
     group.finish();
 }
 
 fn bench_wave_tick(c: &mut Criterion) {
     let mut group = c.benchmark_group("wave_tick");
-    
+
     for size in [15, 25, 35].iter() {
         group.bench_with_input(format!("single_tick_{}", size), size, |b, &size| {
             b.iter_batched(
@@ -176,7 +173,7 @@ fn bench_wave_tick(c: &mut Criterion) {
             );
         });
     }
-    
+
     group.finish();
 }
 
@@ -191,7 +188,7 @@ fn configure_criterion() -> Criterion {
 criterion_group!(
     name = benches;
     config = configure_criterion();
-    targets = 
+    targets =
         bench_maybe_collapse,
         bench_superstate_tick,
         bench_superstate_collapse,
@@ -204,7 +201,7 @@ criterion_group!(
 criterion_group!(
     name = benches;
     config = configure_criterion();
-    targets = 
+    targets =
         bench_maybe_collapse,
         bench_superstate_tick,
         bench_superstate_collapse,
