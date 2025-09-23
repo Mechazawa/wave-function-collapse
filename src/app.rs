@@ -157,28 +157,28 @@ impl WfcApp {
 
         // Add SDL2 renderer if requested
         #[cfg(feature = "visual")]
-        if self.config.renderer.visual {
-            if let Some(first_tile) = tiles.first() {
-                // Get the actual tile dimensions
-                let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
+        if self.config.renderer.visual
+            && let Some(first_tile) = tiles.first()
+        {
+            // Get the actual tile dimensions
+            let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
 
-                // Calculate window size based on actual tile size
-                let window_size = Size {
-                    width: self.config.output_size.width * tile_width as usize,
-                    height: self.config.output_size.height * tile_height as usize,
-                };
+            // Calculate window size based on actual tile size
+            let window_size = Size {
+                width: self.config.output_size.width * tile_width as usize,
+                height: self.config.output_size.height * tile_height as usize,
+            };
 
-                let sdl_config = SdlConfig {
-                    window_size,
-                    vsync: self.config.renderer.vsync,
-                    fullscreen: self.config.renderer.fullscreen,
-                    show_debug: self.config.renderer.debug,
-                    render_every_step: self.config.renderer.slow,
-                };
+            let sdl_config = SdlConfig {
+                window_size,
+                vsync: self.config.renderer.vsync,
+                fullscreen: self.config.renderer.fullscreen,
+                show_debug: self.config.renderer.debug,
+                render_every_step: self.config.renderer.slow,
+            };
 
-                if let Ok(sdl_renderer) = SdlRenderer::new(&sdl_config) {
-                    renderers.push(Box::new(sdl_renderer));
-                }
+            if let Ok(sdl_renderer) = SdlRenderer::new(&sdl_config) {
+                renderers.push(Box::new(sdl_renderer));
             }
         }
 

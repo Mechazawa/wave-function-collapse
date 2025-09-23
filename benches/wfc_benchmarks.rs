@@ -1,5 +1,6 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use rand::SeedableRng;
+use std::hint::black_box;
 use std::sync::Arc;
 
 use wave_function_collapse::{grid::Grid, superstate::SuperState, tile::Tile, wave::Wave};

@@ -136,10 +136,10 @@ fn test_superstate_collapse_weighted_selection() {
         let mut state_copy = state.clone();
         state_copy.collapse(&mut rng);
 
-        if let Some(collapsed) = state_copy.collapsed() {
-            if collapsed.get_id() == 0 {
-                tile_0_selected += 1;
-            }
+        if let Some(collapsed) = state_copy.collapsed()
+            && collapsed.get_id() == 0
+        {
+            tile_0_selected += 1;
         }
     }
 
