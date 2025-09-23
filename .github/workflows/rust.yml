@@ -1,51 +1,54 @@
-name: Build and Store Artifacts
+name: CI
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
+  push:
+    branches:
+      - master
 
 env:
-  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  test:
+    name: Test Rust ${{ matrix.rust }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - target: aarch64-unknown-linux-gnu
-            arch: aarch64
-            toolchain: stable
-          - target: x86_64-unknown-linux-gnu
-            arch: amd64
-            toolchain: stable
-
+          - { rust: stable,           os: ubuntu-latest }
+          - { rust: beta,             os: ubuntu-latest }
+          - { rust: nightly,          os: ubuntu-latest }
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: ${{ matrix.rust }}
+      - run: cargo test --verbose --workspace
+      - run: cargo test --verbose --workspace --all-features
+      - run: cargo test --verbose --workspace --no-default-features
 
-    - name: Install dependencies
-      run: |
-        sudo dpkg --add-architecture arm64
-        sudo apt-get update
-        sudo apt-get install -y libsdl2-dev:${{ matrix.arch }} libsdl2-image-dev:${{ matrix.arch }}
+  clippy:
+    name: Lint with clippy
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          components: clippy
+      - run: cargo clippy --workspace --all-targets --verbose
+      - run: cargo clippy --workspace --all-targets --verbose --no-default-features
+      - run: cargo clippy --workspace --all-targets --verbose --all-features
 
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-          target: ${{ matrix.target }}
-
-    - name: Install cross
-      run: cargo install cross
-
-    - name: Build
-      run: cross build --target ${{ matrix.target }}
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.target }}
-        path: target/${{ matrix.target }}/debug/*
+  rustfmt:
+    name: Verify code formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
