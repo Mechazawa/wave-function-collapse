@@ -5,16 +5,16 @@ use crate::grid::Size;
 use crate::superstate::Collapsable;
 use crate::wave::Set;
 
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use log::debug;
 
 #[cfg(feature = "image-input")]
 mod image_imports {
     pub use fxhash::FxHashMap;
-    pub use image::ImageReader;
     pub use image::DynamicImage;
     pub use image::GenericImageView;
     pub use image::ImageBuffer;
+    pub use image::ImageReader;
     pub use image::Pixel;
     pub use num_traits::cast::ToPrimitive;
     pub use serde::Deserialize;

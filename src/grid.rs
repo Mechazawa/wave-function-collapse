@@ -1,5 +1,5 @@
 use core::str::FromStr;
-use enum_map::{enum_map, Enum, EnumMap};
+use enum_map::{Enum, EnumMap, enum_map};
 use std::mem;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Enum)]

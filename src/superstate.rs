@@ -1,7 +1,7 @@
 use crate::grid::Neighbors;
 use crate::wave::Set;
-use rand::prelude::IndexedRandom;
 use rand::RngCore;
+use rand::prelude::IndexedRandom;
 use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]

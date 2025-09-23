@@ -4,6 +4,7 @@ use crate::superstate::Collapsable;
 use crate::tile::Tile;
 
 use image::{DynamicImage, GenericImageView};
+use sdl2::EventPump;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
@@ -11,7 +12,6 @@ use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::FullscreenType;
 use sdl2::video::Window;
-use sdl2::EventPump;
 use std::collections::HashMap;
 
 /// SDL2-based real-time renderer for visualizing WFC generation

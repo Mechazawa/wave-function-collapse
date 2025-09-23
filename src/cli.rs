@@ -5,8 +5,8 @@ use image::{DynamicImage, ImageError};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
-use structopt::clap::Shell;
 use structopt::StructOpt;
+use structopt::clap::Shell;
 use structopt_flags::QuietVerbose;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
