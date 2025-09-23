@@ -84,6 +84,25 @@ where
         }
     }
 
+    pub fn coerce(&mut self, tile_id: T::Identifier) -> bool {
+        if self.entropy > 1 {
+            let chosen_index = self.possible.iter().position(|v| v.get_id() == tile_id);
+
+            if let Some(pos) = chosen_index {
+                let chosen = self.possible.swap_remove(pos);
+
+                self.possible.clear();
+                self.possible.push(chosen);
+            }
+
+            self.update_entropy();
+
+            chosen_index.is_some()
+        } else {
+            false
+        }
+    }
+
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
         if self.entropy > 1 {
             self.possible.sort_by_key(|a| a.get_id());

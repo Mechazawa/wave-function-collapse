@@ -6,7 +6,7 @@ use rand::prelude::IndexedRandom;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use crate::grid::{Direction, Grid, Neighbors, Position};
+use crate::grid::{Grid, Neighbors, Position};
 use crate::superstate::{Collapsable, SuperState};
 
 type CellNeighbors<T> = Option<Neighbors<Set<<T as Collapsable>::Identifier>>>;
@@ -27,6 +27,7 @@ where
     stack: VecDeque<Position>,
     // todo tmp pub
     pub data: Grid<CellNeighbors<T>>,
+    // todo remove the CollapseReason because it's unused
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
     last_rollback: usize,
@@ -207,10 +208,10 @@ where
         trace!("Collapsed: {collapsed_count}");
 
         if collapsed_count <= self.last_rollback {
-            self.rollback_penalty += 0.5;
+            self.rollback_penalty += 1.0;
         } else {
             self.last_rollback = collapsed_count;
-            self.rollback_penalty = 0.5;
+            self.rollback_penalty = 0.1;
         }
 
         let collapsed_count = self
@@ -223,28 +224,30 @@ where
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         if collapsed_count < self.rollback_penalty.ceil() as usize {
             warn!("Unable to solve, resetting...");
-            for (x, y, cell) in &self.grid_base {
-                self.grid.set(x, y, cell.clone()).unwrap();
-                self.data.set(x, y, None).unwrap();
-            }
 
-            self.collapsed.clear();
-            self.stack.clear();
-            self.rollback_penalty = 0.5;
-            self.last_rollback = 0;
+            self.reset();
+            self.reset_rollback_penalty();
         } else {
             // Todo replace the rollback_penalty with a usize instead of using floats
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let rollback_amount = self.rollback_penalty.ceil() as usize;
             self.rollback(rollback_amount);
-
-            // tmp hack, shouldn't have to do this...
-            self.stack.clear();
-            for (x, y, _) in &self.grid {
-                self.data.set(x, y, None).unwrap();
-                self.stack.push_back((x, y));
-            }
         }
+    }
+
+    fn reset(&mut self) {
+        for (x, y, cell) in &self.grid_base {
+            self.grid.set(x, y, cell.clone()).unwrap();
+            self.data.set(x, y, None).unwrap();
+        }
+
+        self.collapsed.clear();
+        self.stack.clear();
+    }
+
+    fn reset_rollback_penalty(&mut self) {
+        self.rollback_penalty = 0.5;
+        self.last_rollback = 0;
     }
 
     fn rollback(&mut self, mut count: usize) {
@@ -257,11 +260,7 @@ where
         self.data.reset_to_default();
 
         // revert last step of collapse stack
-        while let Some(((x, y), reason)) = self.collapsed.pop() {
-            self.rollback_propegate(x, y, None);
-
-            self.stack.push_front((x, y));
-
+        while let Some((_, reason)) = self.collapsed.pop() {
             if reason == CollapseReason::Explicit {
                 count -= 1;
 
@@ -270,54 +269,8 @@ where
                 }
             }
         }
-    }
 
-    fn rollback_propegate(&mut self, x: usize, y: usize, from: Option<Direction>) {
-        // set state to base state
-        let base = self.grid_base.get(x, y).unwrap().clone();
-        self.grid.set(x, y, base).unwrap();
-        self.stack.push_back((x, y));
-
-        // for each neighbor (skipping "from" direction)
-        //  - get entropy
-        //  - set to base
-        //  - tick
-        //  - if entropy changed recurse
-
-        for (direction, value) in self.grid.get_neighbor_positions(x, y) {
-            if direction == from.unwrap_or(direction.invert()) {
-                continue;
-            }
-
-            if let Some((nx, ny)) = value {
-                let cell = self.grid.get(nx, ny).unwrap();
-                let entropy = cell.entropy();
-
-                if entropy == 1 || !cell.collapsing() {
-                    continue;
-                }
-
-                let mut base = self.grid_base.get(nx, ny).unwrap().clone();
-
-                let neighbors = self.grid.get_neighbors(nx, ny).map(|_, v| match v {
-                    None => Set::default(),
-                    Some(neighbor) => neighbor
-                        .possible
-                        .iter()
-                        .map(|x| x.get_id())
-                        .collect::<Set<_>>(),
-                });
-
-                base.tick(&neighbors);
-
-                let new_entropy = base.entropy();
-
-                if entropy != new_entropy {
-                    // todo: Remove recursion
-                    self.rollback_propegate(nx, ny, Some(direction.invert()));
-                }
-            }
-        }
+        self.resettle();
     }
 
     fn collapsable_areas(&self) -> Vec<Vec<Position>> {
@@ -361,5 +314,41 @@ where
         output.sort_by_key(Vec::len);
 
         output
+    }
+
+    fn resettle(&mut self) {
+        let explicit_collapsed: Vec<(Position, T::Identifier)> = self
+            .collapsed
+            .iter()
+            .filter(|(_, r)| *r == CollapseReason::Explicit)
+            .map(|(p, _)| *p)
+            .map(|(x, y)| {
+                (
+                    (x, y),
+                    self.grid
+                        .get(x, y)
+                        .and_then(|cell| Some(cell.collapsed()?.get_id())),
+                )
+            })
+            .filter(|(_, v)| v.is_some())
+            .map(|(p, v)| (p, v.unwrap()))
+            .collect();
+
+        self.reset();
+
+        for ((x, y), id) in explicit_collapsed {
+            let coerced = self
+                .grid
+                .get_mut(x, y)
+                .map_or(false, |cell| cell.coerce(id));
+
+            if !coerced {
+                warn!("Failed to coerce cell at ({x}, {y})");
+                continue;
+            }
+
+            self.collapsed.push(((x, y), CollapseReason::Explicit));
+            self.mark(x, y);
+        }
     }
 }
