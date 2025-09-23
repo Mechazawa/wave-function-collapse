@@ -235,10 +235,6 @@ fn test_tile_from_image_consistency() {
 
     // Each tile should have valid neighbor relationships
     for tile in &tiles {
-        assert!(tile.neighbors[Direction::Up].len() >= 0);
-        assert!(tile.neighbors[Direction::Right].len() >= 0);
-        assert!(tile.neighbors[Direction::Down].len() >= 0);
-        assert!(tile.neighbors[Direction::Left].len() >= 0);
         assert!(tile.get_weight() > 0);
     }
 }
