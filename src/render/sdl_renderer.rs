@@ -28,6 +28,7 @@ pub struct SdlRenderer {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct SdlConfig {
     pub window_size: Size,
     pub vsync: bool,
