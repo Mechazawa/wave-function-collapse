@@ -324,7 +324,7 @@ where
         let mut board = Grid::<bool>::new(self.grid.width(), self.grid.height(), &mut |x, y| {
             self.grid
                 .get(x, y)
-                .map_or(false, |cell| cell.entropy() == 1)
+                .is_some_and(|cell| cell.entropy() == 1)
         });
 
         let mut stack: Vec<Position> = Vec::default();

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rand::SeedableRng;
 
 use wave_function_collapse::{
-    grid::{Grid, Size},
+    grid::Grid,
     superstate::SuperState,
     tile::Tile,
     wave::Wave,
@@ -19,7 +19,7 @@ fn create_test_tiles() -> Vec<Tile<u32>> {
     // Create simple test tiles with deterministic properties
     let mut tiles = Vec::with_capacity(16);
     for i in 0..16 {
-        let mut tile = Tile::new(i as u64, i as u32);
+        let mut tile = Tile::new(i, i as u32);
         
         // Add some neighbor relationships for realistic constraints
         for neighbor_id in 0..4 {
@@ -136,6 +136,7 @@ fn bench_grid_operations(c: &mut Criterion) {
 
 #[cfg(feature = "image")]
 fn bench_tile_from_image(c: &mut Criterion) {
+    use wave_function_collapse::grid::Size;
     use image::{DynamicImage, RgbaImage};
     
     let mut group = c.benchmark_group("tile_from_image");

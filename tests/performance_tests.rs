@@ -122,9 +122,8 @@ fn test_superstate_collapse_weighted_selection() {
 
     // Set very different weights
     tiles[0].weight = 1000; // Very high weight
-    tiles[1].weight = 1; // Very low weight
-    for i in 2..5 {
-        tiles[i].weight = 1; // Very low weight
+    for tile in tiles.iter_mut().take(5).skip(1) {
+        tile.weight = 1; // Very low weight
     }
 
     let state = SuperState::new(tiles.into_iter().map(Arc::new).collect());
