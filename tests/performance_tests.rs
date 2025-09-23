@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
 use wave_function_collapse::{
-    grid::{Direction, Grid, Size},
+    grid::{Direction, Grid},
     superstate::{SuperState, Collapsable},
     tile::Tile,
     wave::Wave,
 };
-
-#[cfg(feature = "image")]
-use image::DynamicImage;
 
 // Fixed seed for deterministic tests
 const TEST_SEED: u64 = 42;
@@ -130,7 +127,7 @@ fn test_superstate_collapse_weighted_selection() {
         tiles[i].weight = 1;  // Very low weight
     }
     
-    let mut state = SuperState::new(tiles.into_iter().map(Arc::new).collect());
+    let state = SuperState::new(tiles.into_iter().map(Arc::new).collect());
     let mut rng = XorShiftRng::seed_from_u64(TEST_SEED);
     
     // Due to high weight, tile 0 should be selected more often
@@ -155,7 +152,7 @@ fn test_superstate_collapse_weighted_selection() {
 #[test]
 fn test_superstate_entropy_caching() {
     let tiles = create_test_tiles(8);
-    let mut state = SuperState::new(tiles.into_iter().map(Arc::new).collect());
+    let state = SuperState::new(tiles.into_iter().map(Arc::new).collect());
     
     let entropy1 = state.entropy();
     let entropy2 = state.entropy();
@@ -169,7 +166,7 @@ fn test_superstate_entropy_caching() {
 
 #[test]
 fn test_grid_neighbor_access_correctness() {
-    let grid = Grid::new(3, 3, &mut |x, y| x * 10 + y);
+    let grid = Grid::new(3, 3, &mut |x, y| y * 10 + x);
     
     // Test corner cell (0,0)
     let neighbors_00 = grid.get_neighbors(0, 0);
@@ -308,10 +305,12 @@ fn test_single_tile_wave() {
     let base_state = SuperState::new(vec![Arc::new(tiles[0].clone())]);
     let grid = Grid::new(2, 2, &mut |_, _| base_state.clone());
     let mut wave = Wave::new(grid, TEST_SEED);
-    
+    let mut max_ticks = 10;
+
     // Should complete immediately since there's only one choice
-    while !wave.done() {
+    while !wave.done() && max_ticks > 0 {
         wave.tick();
+        max_ticks -= 1;
     }
     
     assert!(wave.done());
