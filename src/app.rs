@@ -164,12 +164,9 @@ impl WfcApp {
                 let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
 
                 // Calculate window size based on actual tile size
-                let window_width = self.config.output_size.width * tile_width as usize;
-                let window_height = self.config.output_size.height * tile_height as usize;
-
                 let window_size = Size {
-                    width: window_width,
-                    height: window_height,
+                    width: self.config.output_size.width * tile_width as usize,
+                    height: self.config.output_size.height * tile_height as usize,
                 };
 
                 let sdl_config = SdlConfig {
