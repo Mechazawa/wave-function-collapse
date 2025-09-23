@@ -1,5 +1,5 @@
-use std::collections::VecDeque;
 use fxhash::FxHashSet;
+use std::collections::VecDeque;
 
 use log::{trace, warn};
 use rand::seq::SliceRandom;
@@ -137,18 +137,18 @@ where
     pub fn maybe_collapse(&mut self) -> Option<Position> {
         let areas = self.collapsable_areas();
         let first_area = areas.first()?;
-        
+
         // Single-pass algorithm to find minimum entropy and collect candidates
         let mut min_entropy = usize::MAX;
         let mut candidates = Vec::new();
-        
+
         for &(x, y) in first_area {
             let entropy = self.grid.get(x, y).map_or(1, SuperState::entropy);
-            
+
             if entropy <= 1 {
                 continue; // Skip collapsed/invalid cells
             }
-            
+
             if entropy < min_entropy {
                 min_entropy = entropy;
                 candidates.clear();
@@ -157,17 +157,15 @@ where
                 candidates.push((x, y));
             }
         }
-        
+
         if candidates.is_empty() {
             return None;
         }
-        
-        candidates
-            .choose(&mut self.rng)
-            .map(|&(x, y)| {
-                self.collapse(x, y);
-                (x, y)
-            })
+
+        candidates.choose(&mut self.rng).map(|&(x, y)| {
+            self.collapse(x, y);
+            (x, y)
+        })
     }
 
     fn mark(&mut self, cx: usize, cy: usize) {
@@ -181,7 +179,8 @@ where
             .collect();
 
         // Collect neighbor positions to avoid borrowing conflicts
-        let neighbor_positions: Vec<_> = self.data
+        let neighbor_positions: Vec<_> = self
+            .data
             .get_neighbor_positions(cx, cy)
             .into_iter()
             .filter_map(|(dir, pos)| pos.map(|p| (dir, p)))
@@ -302,7 +301,11 @@ where
 
                 let neighbors = self.grid.get_neighbors(nx, ny).map(|_, v| match v {
                     None => Set::default(),
-                    Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect::<Set<_>>(),
+                    Some(neighbor) => neighbor
+                        .possible
+                        .iter()
+                        .map(|x| x.get_id())
+                        .collect::<Set<_>>(),
                 });
 
                 base.tick(&neighbors);
@@ -319,9 +322,9 @@ where
 
     fn collapsable_areas(&self) -> Vec<Vec<Position>> {
         let mut board = Grid::<bool>::new(self.grid.width(), self.grid.height(), &mut |x, y| {
-            let item = self.grid.get(x, y).unwrap();
-
-            item.entropy() == 1
+            self.grid
+                .get(x, y)
+                .map_or(false, |cell| cell.entropy() == 1)
         });
 
         let mut stack: Vec<Position> = Vec::default();
