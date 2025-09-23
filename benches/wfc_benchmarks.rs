@@ -81,7 +81,10 @@ fn bench_superstate_tick(c: &mut Criterion) {
     group.bench_function("tick_many_possibilities", |b| {
         b.iter_batched(
             || SuperState::new(tiles.iter().cloned().map(Arc::new).collect()),
-            |mut state| black_box(state.tick(&neighbors)),
+            |mut state| {
+                state.tick(&neighbors);
+                black_box(())
+            },
             criterion::BatchSize::SmallInput,
         );
     });
@@ -101,7 +104,10 @@ fn bench_superstate_collapse(c: &mut Criterion) {
                 let state = SuperState::new(tiles.iter().cloned().map(Arc::new).collect());
                 (state, rng)
             },
-            |(mut state, mut rng)| black_box(state.collapse(&mut rng)),
+            |(mut state, mut rng)| {
+                state.collapse(&mut rng);
+                black_box(())
+            },
             criterion::BatchSize::SmallInput,
         );
     });
