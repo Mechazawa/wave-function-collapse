@@ -121,6 +121,15 @@ where
         while !self.done() && self.tick() {}
     }
 
+    /// Starts over from the untouched grid with a new seed, keeping the tile set.
+    pub fn reseed(&mut self, seed: u64) {
+        self.rng = Box::new(XorShiftRng::seed_from_u64(seed));
+        self.seed = seed;
+        self.last_rollback = 0;
+        self.rollback_penalty = 0.0;
+        self.reset();
+    }
+
     pub fn tick_once(&mut self) -> Option<Position> {
         if let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);

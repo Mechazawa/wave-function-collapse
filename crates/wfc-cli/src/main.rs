@@ -1,14 +1,10 @@
-mod app;
-mod cli;
-mod render;
+use clap::{CommandFactory, Parser};
+use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use std::io;
+use wfc_cli::app::WfcApp;
+use wfc_cli::cli::Opt;
 
 fn main() {
-    use app::WfcApp;
-    use clap::{CommandFactory, Parser};
-    use cli::Opt;
-    use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-    use std::io;
-
     let opt = Opt::parse();
 
     if let Some(shell) = opt.completions {
@@ -27,12 +23,10 @@ fn main() {
     )
     .unwrap();
 
-    let result = opt
+    if let Err(error) = opt
         .into_app_config()
-        .map_err(|error| error.into())
-        .and_then(|config| WfcApp::new(config).run());
-
-    if let Err(error) = result {
+        .and_then(|config| WfcApp::new(config).run())
+    {
         eprintln!("Error: {error}");
         std::process::exit(1);
     }

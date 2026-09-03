@@ -1,11 +1,13 @@
+use crate::error::Error;
+use crate::tiles::TileConfig;
+
 use clap::Parser;
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use image::{DynamicImage, ImageReader};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
-use wave_function_collapse::grid::Size;
-use wave_function_collapse::tile::TileConfig;
+use wave_function_collapse::Size;
 
 #[derive(Debug)]
 pub enum Input {
@@ -16,7 +18,7 @@ pub enum Input {
 impl Input {
     /// Reads whichever of the two input shapes the path holds: a sample image to
     /// cut into tiles, or a JSON list of tiles with their edge labels.
-    fn load(path: &Path) -> Result<Self, String> {
+    fn load(path: &Path) -> Result<Self, Error> {
         let image_error = match ImageReader::open(path) {
             Err(error) => error.to_string(),
             Ok(reader) => match reader.decode() {
@@ -25,18 +27,16 @@ impl Input {
             },
         };
 
-        let display = path.display();
-
         File::open(path)
             .map_err(|error| error.to_string())
             .and_then(|file| {
                 serde_json::from_reader(BufReader::new(file)).map_err(|error| error.to_string())
             })
             .map(Self::Config)
-            .map_err(|config_error| {
-                format!(
-                    "{display} is neither an image ({image_error}) nor a tile config ({config_error})"
-                )
+            .map_err(|config_error| Error::UnreadableInput {
+                path: path.to_path_buf(),
+                image: image_error,
+                config: config_error,
             })
     }
 }
@@ -138,9 +138,15 @@ pub struct Opt {
 
 impl Opt {
     /// # Errors
-    /// When no input path was given, or the file behind it will not load.
-    pub fn into_app_config(self) -> Result<AppConfig, String> {
-        let path = self.input.ok_or("Input is required")?;
+    /// When the file behind the input path will not load.
+    ///
+    /// # Panics
+    /// When no input path was given. clap requires one unless --completions was
+    /// asked for, which main handles before reaching here.
+    pub fn into_app_config(self) -> Result<AppConfig, Error> {
+        let path = self
+            .input
+            .expect("clap requires an input unless --completions");
 
         Ok(AppConfig {
             input: Input::load(&path)?,

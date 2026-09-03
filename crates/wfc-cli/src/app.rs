@@ -1,14 +1,14 @@
 use crate::cli::{AppConfig, Input};
+use crate::error::Error;
 use crate::render::Renderer;
-use wave_function_collapse::grid::{Grid, Size};
-use wave_function_collapse::superstate::SuperState;
-use wave_function_collapse::tile::Tile;
-use wave_function_collapse::wave::Wave;
+use crate::tiles;
+use wave_function_collapse::SuperState;
+use wave_function_collapse::{Grid, Size};
+use wave_function_collapse::{Tile, Wave};
 
 #[cfg(feature = "visual")]
 use crate::render::sdl_renderer::{SdlConfig, SdlRenderer};
 
-#[cfg(feature = "image")]
 use crate::render::image_renderer::ImageRenderer;
 
 use image::DynamicImage;
@@ -21,7 +21,7 @@ use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
 
-type RendererVec = Vec<Box<dyn Renderer<DynamicImage, Error = String>>>;
+type RendererVec = Vec<Box<dyn Renderer<DynamicImage>>>;
 
 pub struct WfcApp {
     config: AppConfig,
@@ -32,17 +32,16 @@ impl WfcApp {
         Self { config }
     }
 
-    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    /// # Errors
+    /// When the tile set cannot be built, or a renderer fails to start or finish.
+    pub fn run(&self) -> Result<(), Error> {
         let mut tiles = match &self.config.input {
             Input::Image(image) => {
-                let tile_size = self
-                    .config
-                    .input_size
-                    .ok_or("--input-size is required to cut a sample image into tiles")?;
+                let tile_size = self.config.input_size.ok_or(Error::MissingInputSize)?;
 
-                Tile::from_image(image, &Size::uniform(tile_size))
+                tiles::from_image(image, &Size::uniform(tile_size))
             }
-            Input::Config(configs) => Tile::from_config(configs),
+            Input::Config(configs) => tiles::from_config(configs),
         }?;
 
         info!("{} unique tiles found", tiles.len());
@@ -101,7 +100,6 @@ impl WfcApp {
             }
         }
 
-        #[cfg(feature = "image")]
         if let Some(output_path) = &self.config.output_path {
             renderers.push(Box::new(ImageRenderer::new(output_path.clone())));
         }

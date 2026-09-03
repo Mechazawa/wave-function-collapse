@@ -1,9 +1,10 @@
 use super::Renderer;
-use wave_function_collapse::tile::Tile;
-use wave_function_collapse::wave::Wave;
+use crate::compose;
+use crate::error::Error;
 
 use image::DynamicImage;
 use std::path::PathBuf;
+use wave_function_collapse::{Tile, Wave};
 
 pub struct ImageRenderer {
     output_path: PathBuf,
@@ -17,24 +18,25 @@ impl ImageRenderer {
 }
 
 impl Renderer<DynamicImage> for ImageRenderer {
-    type Error = String;
-
     fn initialize(
         &mut self,
         tiles: &[Tile<DynamicImage>],
         _output_size: (usize, usize),
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), Error> {
         if tiles.is_empty() {
-            return Err("No tiles provided".to_string());
+            return Err(Error::NoTiles);
         }
 
         Ok(())
     }
 
-    fn finalize(&mut self, wfc: &Wave<Tile<DynamicImage>>) -> Result<(), Self::Error> {
-        wfc.to_rgba()
-            .ok_or_else(|| "Wave holds no tiles".to_string())?
+    fn finalize(&mut self, wfc: &Wave<Tile<DynamicImage>>) -> Result<(), Error> {
+        compose::to_rgba(wfc)
+            .ok_or(Error::NoTiles)?
             .save(&self.output_path)
-            .map_err(|e| format!("Failed to save image: {e}"))
+            .map_err(|source| Error::Output {
+                path: self.output_path.clone(),
+                source,
+            })
     }
 }

@@ -1,6 +1,5 @@
-#![cfg(feature = "image")]
-
-use wave_function_collapse::{Collapsable, Direction, Set, Tile, tile::TileConfig};
+use wave_function_collapse::{Collapsable, Direction, Set};
+use wfc_cli::tiles::{self, TileConfig};
 
 use image::{Rgba, RgbaImage};
 use std::path::Path;
@@ -39,7 +38,7 @@ fn write_tiles(directory: &Path) -> Vec<TileConfig> {
 #[test]
 fn matching_edge_labels_face_each_other() {
     let directory = tempfile::tempdir().unwrap();
-    let tiles = Tile::from_config(&write_tiles(directory.path())).unwrap();
+    let tiles = tiles::from_config(&write_tiles(directory.path())).unwrap();
 
     let ids: Vec<u64> = tiles.iter().map(Collapsable::get_id).collect();
     let [a, b, c] = tiles.as_slice() else {
@@ -69,26 +68,29 @@ fn matching_edge_labels_face_each_other() {
 
 #[test]
 fn a_tile_needs_four_edge_labels() {
-    use wave_function_collapse::Error;
+    use wfc_cli::Error;
 
     let directory = tempfile::tempdir().unwrap();
     let mut configs = write_tiles(directory.path());
     configs[1].slots.pop();
 
     assert!(matches!(
-        Tile::from_config(&configs),
+        tiles::from_config(&configs),
         Err(Error::SlotCount { found: 3 })
     ));
 }
 
 #[test]
 fn a_missing_tile_image_is_reported() {
-    use wave_function_collapse::Error;
+    use wfc_cli::Error;
 
     let configs = vec![TileConfig {
         image: Path::new("/nonexistent/tile.png").to_path_buf(),
         slots: vec!["a".into(), "b".into(), "c".into(), "d".into()],
     }];
 
-    assert!(matches!(Tile::from_config(&configs), Err(Error::Io(_))));
+    assert!(matches!(
+        tiles::from_config(&configs),
+        Err(Error::Tile { .. })
+    ));
 }

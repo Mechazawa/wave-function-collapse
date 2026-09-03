@@ -1,7 +1,6 @@
-#![cfg(feature = "image")]
-
 use std::sync::Arc;
 use wave_function_collapse::{Grid, Neighbors, Set, SuperState, Tile, Wave};
+use wfc_cli::compose;
 
 use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 
@@ -39,14 +38,14 @@ fn wave(width: usize, height: usize, tiles: Vec<Tile<DynamicImage>>) -> Wave<Til
 
 #[test]
 fn canvas_covers_the_grid_at_tile_resolution() {
-    let composed = wave(4, 7, colour_tiles(5)).to_rgba().unwrap();
+    let composed = compose::to_rgba(&wave(4, 7, colour_tiles(5))).unwrap();
 
     assert_eq!(composed.dimensions(), (4 * TILE_SIZE, 7 * TILE_SIZE));
 }
 
 #[test]
 fn open_cells_stay_transparent() {
-    let composed = wave(3, 3, colour_tiles(5)).to_rgba().unwrap();
+    let composed = compose::to_rgba(&wave(3, 3, colour_tiles(5))).unwrap();
 
     assert!(
         composed.pixels().all(|pixel| pixel.0[3] == 0),
@@ -64,7 +63,7 @@ fn each_cell_lands_at_its_own_offset() {
         "the tile set is fully permissive, so it must solve"
     );
 
-    let composed = wave.to_rgba().unwrap();
+    let composed = compose::to_rgba(&wave).unwrap();
 
     for (x, y, cell) in wave.grid() {
         let expected = cell.collapsed().unwrap().value.get_pixel(0, 0);
@@ -79,5 +78,5 @@ fn each_cell_lands_at_its_own_offset() {
 
 #[test]
 fn a_wave_without_tiles_has_nothing_to_compose() {
-    assert!(wave(2, 2, Vec::new()).to_rgba().is_none());
+    assert!(compose::to_rgba(&wave(2, 2, Vec::new())).is_none());
 }
