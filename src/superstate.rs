@@ -6,22 +6,20 @@ use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]
 use {
-    lazy_static::lazy_static, log::trace, rayon::prelude::IntoParallelRefIterator,
-    rayon::prelude::ParallelIterator,
+    log::trace, rayon::prelude::IntoParallelRefIterator, rayon::prelude::ParallelIterator,
+    std::sync::LazyLock,
 };
 
 #[cfg(feature = "threaded")]
-lazy_static! {
-    static ref PAR_MIN_LEN: usize = {
-        let workload_size: f32 = 20.0; // todo tune
-        let num_threads = rayon::current_num_threads();
-        let min_len = (workload_size * num_threads as f32).ceil() as usize;
+/// Entropy below which spreading the possibility filter over threads costs more than
+/// it saves. The per-thread figure is a guess, not a measurement.
+static PAR_MIN_LEN: LazyLock<usize> = LazyLock::new(|| {
+    let min_len = 20 * rayon::current_num_threads();
 
-        trace!("Min workload size before threading: {min_len}");
+    trace!("Min workload size before threading: {min_len}");
 
-        min_len
-    };
-}
+    min_len
+});
 
 pub trait Collapsable: Clone + Sync + Send {
     type Identifier: Clone + Eq + Hash + Ord + Sync + Send;

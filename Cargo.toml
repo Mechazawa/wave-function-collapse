@@ -11,7 +11,6 @@ enum-map = "2.5"
 fxhash = "0.2"
 image = { version = "0.25.8", optional = true }
 indicatif = "0.18.0"
-lazy_static = { version = "1.4.0", optional = true }
 log = "0.4"
 num-traits = "0.2"
 rand = "0.9.2"
@@ -46,7 +45,7 @@ default = ["image-output", "visual"]
 image-input = ["dep:image", "dep:serde", "dep:serde_json"]
 image-output = ["image-input"]
 visual = ["image-input", "dep:sdl2"]
-threaded = ["dep:rayon", "dep:lazy_static"]
+threaded = ["dep:rayon"]
 
 # Convenience aliases
 image = ["image-input"]  # Backward compatibility
