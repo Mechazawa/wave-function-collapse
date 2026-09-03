@@ -34,8 +34,15 @@ impl WfcApp {
 
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let mut tiles = match &self.config.input {
-            Input::Image(value) => Tile::from_image(value, &Size::uniform(self.config.input_size)),
-            Input::Config(value) => Tile::from_config(value),
+            Input::Image(image) => {
+                let tile_size = self
+                    .config
+                    .input_size
+                    .ok_or("--input-size is required to cut a sample image into tiles")?;
+
+                Tile::from_image(image, &Size::uniform(tile_size))
+            }
+            Input::Config(configs) => Tile::from_config(configs),
         }?;
 
         info!("{} unique tiles found", tiles.len());

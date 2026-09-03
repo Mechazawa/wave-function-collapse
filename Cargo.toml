@@ -31,11 +31,12 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 rayon = { version = "1.7.0", optional = true }
 
 # cli
+clap = { version = "4.5", features = ["derive"], optional = true }
+clap-verbosity-flag = { version = "3.0", optional = true }
+clap_complete = { version = "4.5", optional = true }
 indicatif = { version = "0.18.0", optional = true }
 serde_json = { version = "1.0", optional = true }
 simplelog = { version = "0.12", features = ["paris"], optional = true }
-structopt = { version = "0.3", optional = true }
-structopt-flags = { version = "0.3", optional = true }
 
 # visual
 sdl2 = { version = "0.38.0", features = [
@@ -73,11 +74,12 @@ threaded = ["dep:rayon"]
 # The command line binary. Required by [[bin]].
 cli = [
     "image",
+    "dep:clap",
+    "dep:clap-verbosity-flag",
+    "dep:clap_complete",
     "dep:indicatif",
     "dep:serde_json",
     "dep:simplelog",
-    "dep:structopt",
-    "dep:structopt-flags",
     "rand/thread_rng",
 ]
 

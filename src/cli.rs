@@ -1,44 +1,44 @@
-use image::ImageReader;
-use image::{DynamicImage, ImageError};
+use clap::Parser;
+use clap_verbosity_flag::{Verbosity, WarnLevel};
+use image::{DynamicImage, ImageReader};
 use std::fs::File;
 use std::io::BufReader;
-use std::path::PathBuf;
-use structopt::StructOpt;
-use structopt::clap::Shell;
-use structopt_flags::QuietVerbose;
+use std::path::{Path, PathBuf};
 use wave_function_collapse::grid::Size;
 use wave_function_collapse::tile::TileConfig;
-
-fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
-    let path = PathBuf::from(s);
-    let image = ImageReader::open(path)?.decode()?;
-    Ok(image)
-}
-
-fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
-    let path = PathBuf::from(s);
-    let file = File::open(path).map_err(|e| format!("Failed to open config file: {e}"))?;
-    let reader = BufReader::new(file);
-    let configs =
-        serde_json::from_reader(reader).map_err(|e| format!("Failed to parse config file: {e}"))?;
-    Ok(configs)
-}
-
-fn load_input(s: &str) -> Result<Input, String> {
-    let image_error = match load_image(s) {
-        Ok(image) => return Ok(Input::Image(image)),
-        Err(error) => error,
-    };
-
-    load_config(s).map(Input::Config).map_err(|config_error| {
-        format!("{s} is neither an image ({image_error}) nor a tile config ({config_error})")
-    })
-}
 
 #[derive(Debug)]
 pub enum Input {
     Image(DynamicImage),
     Config(Vec<TileConfig>),
+}
+
+impl Input {
+    /// Reads whichever of the two input shapes the path holds: a sample image to
+    /// cut into tiles, or a JSON list of tiles with their edge labels.
+    fn load(path: &Path) -> Result<Self, String> {
+        let image_error = match ImageReader::open(path) {
+            Err(error) => error.to_string(),
+            Ok(reader) => match reader.decode() {
+                Ok(image) => return Ok(Self::Image(image)),
+                Err(error) => error.to_string(),
+            },
+        };
+
+        let display = path.display();
+
+        File::open(path)
+            .map_err(|error| error.to_string())
+            .and_then(|file| {
+                serde_json::from_reader(BufReader::new(file)).map_err(|error| error.to_string())
+            })
+            .map(Self::Config)
+            .map_err(|config_error| {
+                format!(
+                    "{display} is neither an image ({image_error}) nor a tile config ({config_error})"
+                )
+            })
+    }
 }
 
 #[cfg(feature = "visual")]
@@ -55,7 +55,8 @@ pub struct RendererConfig {
 #[derive(Debug)]
 pub struct AppConfig {
     pub input: Input,
-    pub input_size: usize,
+    /// Only a sample image needs cutting into tiles; a tile config brings its own.
+    pub input_size: Option<usize>,
     pub output_size: Size,
     pub output_path: Option<PathBuf>,
     #[cfg(not(feature = "threaded"))]
@@ -64,76 +65,86 @@ pub struct AppConfig {
     pub renderer: RendererConfig,
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(
-    name = "Wave Function Collapse",
-    about = "Generate images using wfc from input images"
+#[derive(Debug, Parser)]
+#[command(
+    name = "wave-function-collapse",
+    about = "Generate images using wfc from input images",
+    version,
+    // -V belongs to --visual, so --version is long only.
+    disable_version_flag = true
 )]
 pub struct Opt {
-    #[structopt(flatten)]
-    pub verbose: QuietVerbose,
+    #[command(flatten)]
+    pub verbose: Verbosity<WarnLevel>,
 
-    #[structopt(parse(try_from_str=load_input), help = "Input", required_unless="completions")]
-    input: Option<Input>,
+    /// Sample image, or a JSON tile config
+    #[arg(required_unless_present = "completions")]
+    input: Option<PathBuf>,
 
-    #[structopt(
-        parse(try_from_str),
-        short,
-        long,
-        required_if("input", "config"),
-        help = "Input image grid size"
-    )]
-    input_size: Option<usize>,
-
-    #[structopt(parse(from_os_str), help = "Output image")]
+    /// Output image
     output: Option<PathBuf>,
 
-    #[structopt(
-        parse(try_from_str),
-        short,
-        long,
-        default_value = "20x20",
-        help = "Output image grid size"
-    )]
+    /// Tile size to cut the sample image into
+    #[arg(short, long)]
+    input_size: Option<usize>,
+
+    /// Output image grid size
+    #[arg(short, long, default_value = "20x20")]
     output_size: Size,
 
+    /// Random seed
     #[cfg(not(feature = "threaded"))]
-    #[structopt(parse(try_from_str), short, long, help = "Random seed")]
+    #[arg(short, long)]
     seed: Option<u64>,
 
+    /// Open a window to show the generation
     #[cfg(feature = "visual")]
-    #[structopt(short = "V", long, help = "Open a window to show the generation")]
+    #[arg(short = 'V', long)]
     visual: bool,
 
+    /// Render every step during visualisation
     #[cfg(feature = "visual")]
-    #[structopt(long, help = "Render every step during visualisation")]
+    #[arg(long)]
     slow: bool,
 
+    /// Show debug info during visualisation
     #[cfg(feature = "visual")]
-    #[structopt(long, help = "Show debug info during visualisation")]
+    #[arg(long)]
     debug: bool,
 
+    /// Turn on vsync
     #[cfg(feature = "visual")]
-    #[structopt(long, help = "Turns on vsync")]
+    #[arg(long)]
     vsync: bool,
 
+    /// Hold the image for n seconds after finishing
     #[cfg(feature = "visual")]
-    #[structopt(long, help = "Hold the image for n seconds after finishing")]
+    #[arg(long)]
     hold: Option<f32>,
 
+    /// Run the application in full screen
     #[cfg(feature = "visual")]
-    #[structopt(short, long, help = "Runs the application in full screen")]
+    #[arg(short, long)]
     fullscreen: bool,
 
-    #[structopt(long, possible_values= &Shell::variants(), case_insensitive = true, help = "Generate shell completions and exit")]
-    pub completions: Option<Shell>,
+    /// Generate shell completions and exit
+    #[arg(long, value_enum)]
+    pub completions: Option<clap_complete::Shell>,
+
+    /// Print version
+    #[arg(long, action = clap::ArgAction::Version)]
+    version: Option<bool>,
 }
 
 impl Opt {
-    pub fn into_app_config(self) -> Result<AppConfig, &'static str> {
+    /// # Errors
+    /// When no input path was given, or the file behind it will not load.
+    pub fn into_app_config(self) -> Result<AppConfig, String> {
+        let path = self.input.ok_or("Input is required")?;
+
         Ok(AppConfig {
-            input: self.input.ok_or("Input is required")?,
-            input_size: self.input_size.ok_or("Input size is required")?,
+            input: Input::load(&path)?,
+            input_size: self.input_size,
             output_size: self.output_size,
             output_path: self.output,
             #[cfg(not(feature = "threaded"))]

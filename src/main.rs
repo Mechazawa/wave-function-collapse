@@ -4,38 +4,36 @@ mod render;
 
 fn main() {
     use app::WfcApp;
+    use clap::{CommandFactory, Parser};
     use cli::Opt;
     use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
     use std::io;
-    use structopt::StructOpt;
-    use structopt_flags::LogLevel;
 
-    let opt: Opt = Opt::from_args();
+    let opt = Opt::parse();
 
     if let Some(shell) = opt.completions {
-        Opt::clap().gen_completions_to(env!("CARGO_PKG_NAME"), shell, &mut io::stdout());
+        let mut command = Opt::command();
+        let name = command.get_name().to_string();
+
+        clap_complete::generate(shell, &mut command, name, &mut io::stdout());
         return;
     }
 
     TermLogger::init(
-        opt.verbose.get_level_filter(),
+        opt.verbose.log_level_filter(),
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )
     .unwrap();
 
-    match opt.into_app_config() {
-        Ok(config) => {
-            let app = WfcApp::new(config);
-            if let Err(e) = app.run() {
-                eprintln!("Error: {e}");
-                std::process::exit(1);
-            }
-        }
-        Err(e) => {
-            eprintln!("Configuration error: {e}");
-            std::process::exit(1);
-        }
+    let result = opt
+        .into_app_config()
+        .map_err(|error| error.into())
+        .and_then(|config| WfcApp::new(config).run());
+
+    if let Err(error) = result {
+        eprintln!("Error: {error}");
+        std::process::exit(1);
     }
 }
