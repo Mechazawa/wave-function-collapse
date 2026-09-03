@@ -1,49 +1,18 @@
 use super::Renderer;
 use wave_function_collapse::tile::Tile;
+use wave_function_collapse::wave::Wave;
 
-use image::{DynamicImage, GenericImageView, RgbaImage};
+use image::DynamicImage;
 use std::path::PathBuf;
 
-/// Image file renderer that saves the final result to disk
 pub struct ImageRenderer {
     output_path: PathBuf,
-    tile_size: (u32, u32),
-    grid_size: (usize, usize),
-    final_image: Option<RgbaImage>,
 }
 
 impl ImageRenderer {
     #[must_use]
     pub fn new(output_path: PathBuf) -> Self {
-        Self {
-            output_path,
-            tile_size: (0, 0),
-            grid_size: (0, 0),
-            final_image: None,
-        }
-    }
-
-    fn create_final_image_from_wfc(
-        &mut self,
-        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
-    ) {
-        let mut canvas = RgbaImage::new(
-            self.grid_size.0 as u32 * self.tile_size.0,
-            self.grid_size.1 as u32 * self.tile_size.1,
-        );
-
-        for (x, y, cell) in wfc.grid() {
-            if let Some(tile) = cell.collapsed() {
-                image::imageops::overlay(
-                    &mut canvas,
-                    &tile.value,
-                    x as i64 * i64::from(self.tile_size.0),
-                    y as i64 * i64::from(self.tile_size.1),
-                );
-            }
-        }
-
-        self.final_image = Some(canvas);
+        Self { output_path }
     }
 }
 
@@ -53,31 +22,19 @@ impl Renderer<DynamicImage> for ImageRenderer {
     fn initialize(
         &mut self,
         tiles: &[Tile<DynamicImage>],
-        output_size: (usize, usize),
+        _output_size: (usize, usize),
     ) -> Result<(), Self::Error> {
         if tiles.is_empty() {
             return Err("No tiles provided".to_string());
         }
 
-        let (tile_width, tile_height) = tiles[0].value.dimensions();
-        self.tile_size = (tile_width, tile_height);
-        self.grid_size = output_size;
-
         Ok(())
     }
 
-    fn finalize(
-        &mut self,
-        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
-    ) -> Result<(), Self::Error> {
-        self.create_final_image_from_wfc(wfc);
-
-        if let Some(image) = &self.final_image {
-            image
-                .save(&self.output_path)
-                .map_err(|e| format!("Failed to save image: {e}"))?;
-        }
-
-        Ok(())
+    fn finalize(&mut self, wfc: &Wave<Tile<DynamicImage>>) -> Result<(), Self::Error> {
+        wfc.to_rgba()
+            .ok_or_else(|| "Wave holds no tiles".to_string())?
+            .save(&self.output_path)
+            .map_err(|e| format!("Failed to save image: {e}"))
     }
 }

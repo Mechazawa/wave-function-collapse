@@ -68,10 +68,17 @@ where
         self.grid.height()
     }
 
+    /// The state every cell starts in, holding the whole tile set. `None` for an
+    /// empty grid.
+    #[must_use]
+    pub fn base_state(&self) -> Option<&SuperState<T>> {
+        self.grid_base.get(0, 0)
+    }
+
     /// How many possibilities a cell starts with. Zero for an empty grid.
     #[must_use]
     pub fn base_entropy(&self) -> usize {
-        self.grid_base.get(0, 0).map_or(0, SuperState::base_entropy)
+        self.base_state().map_or(0, SuperState::base_entropy)
     }
 
     #[must_use]
