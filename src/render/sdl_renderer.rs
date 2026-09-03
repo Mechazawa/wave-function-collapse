@@ -90,8 +90,8 @@ impl SdlRenderer {
                 continue;
             }
 
-            let rgba = tile.value.as_ref().to_rgba8();
-            let (width, height) = tile.value.as_ref().dimensions();
+            let rgba = tile.value.to_rgba8();
+            let (width, height) = tile.value.dimensions();
 
             let mut texture = texture_creator
                 .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
@@ -135,7 +135,7 @@ impl SdlRenderer {
         self.canvas.clear();
         self.canvas.set_blend_mode(BlendMode::Blend);
 
-        for (x, y, cell) in &wfc.grid {
+        for (x, y, cell) in wfc.grid() {
             let rect = Rect::new(
                 x as i32 * tile_width as i32,
                 y as i32 * tile_height as i32,
@@ -192,7 +192,7 @@ impl Renderer<DynamicImage> for SdlRenderer {
             return Err("No tiles provided".to_string());
         }
 
-        let (tile_width, tile_height) = tiles[0].value.as_ref().dimensions();
+        let (tile_width, tile_height) = tiles[0].value.dimensions();
         self.tile_size = (tile_width, tile_height);
         self.grid_size = output_size;
 

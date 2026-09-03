@@ -32,11 +32,11 @@ impl ImageRenderer {
             self.grid_size.1 as u32 * self.tile_size.1,
         );
 
-        for (x, y, cell) in &wfc.grid {
+        for (x, y, cell) in wfc.grid() {
             if let Some(tile) = cell.collapsed() {
                 image::imageops::overlay(
                     &mut canvas,
-                    tile.value.as_ref(),
+                    &tile.value,
                     x as i64 * i64::from(self.tile_size.0),
                     y as i64 * i64::from(self.tile_size.1),
                 );
@@ -59,7 +59,7 @@ impl Renderer<DynamicImage> for ImageRenderer {
             return Err("No tiles provided".to_string());
         }
 
-        let (tile_width, tile_height) = tiles[0].value.as_ref().dimensions();
+        let (tile_width, tile_height) = tiles[0].value.dimensions();
         self.tile_size = (tile_width, tile_height);
         self.grid_size = output_size;
 

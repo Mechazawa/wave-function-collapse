@@ -22,14 +22,14 @@ pub struct Wave<T>
 where
     T: Collapsable,
 {
-    pub grid: Grid<SuperState<T>>,
+    grid: Grid<SuperState<T>>,
     grid_base: Grid<SuperState<T>>,
     stack: VecDeque<Position>,
-    // todo tmp pub
-    pub data: Grid<CellNeighbors<T>>,
+    data: Grid<CellNeighbors<T>>,
     // todo remove the CollapseReason because it's unused
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
+    seed: u64,
     last_rollback: usize,
     rollback_penalty: f64,
 }
@@ -47,9 +47,36 @@ where
             grid_base: grid.clone(),
             grid,
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
+            seed,
             last_rollback: 0,
             rollback_penalty: 0.0,
         }
+    }
+
+    #[must_use]
+    pub fn grid(&self) -> &Grid<SuperState<T>> {
+        &self.grid
+    }
+
+    #[must_use]
+    pub fn width(&self) -> usize {
+        self.grid.width()
+    }
+
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.grid.height()
+    }
+
+    /// How many possibilities a cell starts with. Zero for an empty grid.
+    #[must_use]
+    pub fn base_entropy(&self) -> usize {
+        self.grid_base.get(0, 0).map_or(0, SuperState::base_entropy)
+    }
+
+    #[must_use]
+    pub fn seed(&self) -> u64 {
+        self.seed
     }
 
     #[must_use]
@@ -71,6 +98,20 @@ where
         }
 
         worked || self.maybe_collapse().is_some()
+    }
+
+    /// Advances at most `limit` units of work and returns how many ran. A shortfall
+    /// means the wave either finished or cannot collapse any cell.
+    pub fn step(&mut self, limit: usize) -> usize {
+        (0..limit)
+            .take_while(|_| self.tick_once().is_some())
+            .count()
+    }
+
+    /// Collapses the whole wave. Returns early when no cell can be collapsed, so
+    /// check `done` to tell a solved wave from a stuck one.
+    pub fn run(&mut self) {
+        while !self.done() && self.tick() {}
     }
 
     pub fn tick_once(&mut self) -> Option<Position> {

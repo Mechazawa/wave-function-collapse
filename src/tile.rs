@@ -19,12 +19,12 @@ use {
 
 #[derive(Debug, Clone)]
 pub struct Tile<T> {
-    pub value: Box<T>,
-    /// todo: neighbours per side
+    pub value: T,
+    /// Ids of the tiles allowed on each side of this one.
     pub neighbors: Neighbors<Set<u64>>,
+    pub weight: usize,
 
     id: u64,
-    pub weight: usize,
 }
 
 #[cfg(feature = "image")]
@@ -154,13 +154,30 @@ impl Tile<DynamicImage> {
 }
 
 impl<T> Tile<T> {
+    /// A tile with no allowed neighbours in any direction, which fails every
+    /// constraint until `neighbors` is populated.
     #[must_use]
     pub fn new(id: u64, value: T) -> Self {
         Self {
             id,
-            value: Box::new(value),
+            value,
             neighbors: EnumMap::default(),
             weight: 1,
+        }
+    }
+
+    #[must_use]
+    pub fn with_neighbors(
+        id: u64,
+        value: T,
+        weight: usize,
+        neighbors: Neighbors<Set<u64>>,
+    ) -> Self {
+        Self {
+            id,
+            value,
+            neighbors,
+            weight,
         }
     }
 }

@@ -89,7 +89,7 @@ impl WfcApp {
         if self.config.renderer.visual
             && let Some(first_tile) = tiles.first()
         {
-            let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
+            let (tile_width, tile_height) = first_tile.value.dimensions();
 
             let sdl_config = SdlConfig {
                 window_size: Size {
@@ -112,7 +112,6 @@ impl WfcApp {
             renderers.push(Box::new(ImageRenderer::new(output_path.clone())));
         }
 
-        // Initialize all renderers
         for renderer in &mut renderers {
             renderer.initialize(
                 &tiles,
@@ -123,7 +122,6 @@ impl WfcApp {
             )?;
         }
 
-        // Progress bar
         let max_progress = wfc.remaining() as u64;
         let progress = ProgressBar::new(max_progress);
         progress.enable_steady_tick(Duration::from_millis(200));
@@ -136,42 +134,44 @@ impl WfcApp {
                 .progress_chars("#>-"),
         );
 
-        // Main generation loop
+        #[cfg(feature = "visual")]
+        let render_every_step = self.config.renderer.visual && self.config.renderer.slow;
+        #[cfg(not(feature = "visual"))]
+        let render_every_step = false;
+
         while !wfc.done() {
             progress.set_position(max_progress - wfc.remaining() as u64);
 
-            // Check if any renderer wants to quit
             if renderers.iter_mut().any(|r| r.should_quit()) {
                 return Ok(());
             }
 
-            // Update renderers with current state
             for renderer in &mut renderers {
                 renderer.update(&wfc)?;
             }
 
-            // Perform WFC step
-            #[cfg(feature = "visual")]
-            if self.config.renderer.visual && self.config.renderer.slow {
-                wfc.tick_once();
+            // One unit of work per redraw shows the propagation front moving;
+            // draining the whole stack per redraw is far faster to finish.
+            let progressed = if render_every_step {
+                wfc.step(1) > 0
             } else {
-                wfc.tick();
-            }
+                wfc.tick()
+            };
 
-            #[cfg(not(feature = "visual"))]
-            wfc.tick();
+            if !progressed {
+                warn!("Unable to make progress, stopping early");
+                break;
+            }
         }
 
         progress.finish();
 
-        // Hold visualization if requested
         #[cfg(feature = "visual")]
         if let Some(delay) = self.config.renderer.hold {
             info!("Waiting for {delay} seconds");
             std::thread::sleep(Duration::from_secs_f32(delay));
         }
 
-        // Finalize all renderers
         for renderer in &mut renderers {
             renderer.finalize(&wfc)?;
         }
