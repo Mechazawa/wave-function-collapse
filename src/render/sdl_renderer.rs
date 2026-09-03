@@ -1,7 +1,7 @@
 use super::Renderer;
-use crate::grid::Size;
-use crate::superstate::Collapsable;
-use crate::tile::Tile;
+use wave_function_collapse::grid::Size;
+use wave_function_collapse::superstate::Collapsable;
+use wave_function_collapse::tile::Tile;
 
 use image::{DynamicImage, GenericImageView};
 use sdl2::EventPump;
@@ -126,7 +126,7 @@ impl SdlRenderer {
 
     fn render_grid_from_wfc(
         &mut self,
-        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
     ) -> Result<(), String> {
         use sdl2::render::BlendMode;
 
@@ -207,7 +207,7 @@ impl Renderer<DynamicImage> for SdlRenderer {
 
     fn update(
         &mut self,
-        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
     ) -> Result<(), Self::Error> {
         self.handle_events();
 
@@ -225,7 +225,7 @@ impl Renderer<DynamicImage> for SdlRenderer {
 
     fn finalize(
         &mut self,
-        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
     ) -> Result<(), Self::Error> {
         self.render_grid_from_wfc(wfc)?;
         Ok(())

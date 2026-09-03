@@ -1,5 +1,3 @@
-use crate::grid::Size;
-use crate::tile::TileConfig;
 use image::ImageReader;
 use image::{DynamicImage, ImageError};
 use std::fs::File;
@@ -8,6 +6,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use structopt::clap::Shell;
 use structopt_flags::QuietVerbose;
+use wave_function_collapse::grid::Size;
+use wave_function_collapse::tile::TileConfig;
 
 fn load_image(s: &str) -> Result<DynamicImage, ImageError> {
     let path = PathBuf::from(s);

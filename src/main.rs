@@ -1,10 +1,6 @@
 mod app;
 mod cli;
-mod grid;
 mod render;
-mod superstate;
-mod tile;
-mod wave;
 
 #[cfg(feature = "image-input")]
 fn main() {

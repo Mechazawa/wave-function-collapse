@@ -1,5 +1,5 @@
 use super::Renderer;
-use crate::tile::Tile;
+use wave_function_collapse::tile::Tile;
 
 use image::{DynamicImage, GenericImageView, RgbaImage};
 use std::path::PathBuf;
@@ -25,7 +25,7 @@ impl ImageRenderer {
 
     fn create_final_image_from_wfc(
         &mut self,
-        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
     ) {
         let mut canvas = RgbaImage::new(
             self.grid_size.0 as u32 * self.tile_size.0,
@@ -68,7 +68,7 @@ impl Renderer<DynamicImage> for ImageRenderer {
 
     fn finalize(
         &mut self,
-        wfc: &crate::wave::Wave<crate::tile::Tile<DynamicImage>>,
+        wfc: &wave_function_collapse::wave::Wave<wave_function_collapse::tile::Tile<DynamicImage>>,
     ) -> Result<(), Self::Error> {
         self.create_final_image_from_wfc(wfc);
 

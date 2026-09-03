@@ -4,8 +4,8 @@ pub mod sdl_renderer;
 #[cfg(feature = "image-output")]
 pub mod image_renderer;
 
-use crate::tile::Tile;
-use crate::wave::Wave;
+use wave_function_collapse::tile::Tile;
+use wave_function_collapse::wave::Wave;
 
 /// Core trait for rendering WFC generation progress
 pub trait Renderer<T>

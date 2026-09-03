@@ -1,9 +1,9 @@
 use crate::cli::{AppConfig, Input};
-use crate::grid::{Grid, Size};
 use crate::render::Renderer;
-use crate::superstate::SuperState;
-use crate::tile::Tile;
-use crate::wave::Wave;
+use wave_function_collapse::grid::{Grid, Size};
+use wave_function_collapse::superstate::SuperState;
+use wave_function_collapse::tile::Tile;
+use wave_function_collapse::wave::Wave;
 
 #[cfg(feature = "visual")]
 use crate::render::sdl_renderer::{SdlConfig, SdlRenderer};
