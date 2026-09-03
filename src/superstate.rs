@@ -82,46 +82,49 @@ where
         }
     }
 
+    /// Narrows this cell to one named tile. `false` when the cell has already
+    /// collapsed or no longer holds that tile as a possibility.
     pub fn coerce(&mut self, tile_id: T::Identifier) -> bool {
-        if self.entropy > 1 {
-            let chosen_index = self.possible.iter().position(|v| v.get_id() == tile_id);
-
-            if let Some(pos) = chosen_index {
-                let chosen = self.possible.swap_remove(pos);
-
-                self.possible.clear();
-                self.possible.push(chosen);
-            }
-
-            self.update_entropy();
-
-            chosen_index.is_some()
-        } else {
-            false
+        if self.entropy <= 1 {
+            return false;
         }
+
+        let Some(index) = self
+            .possible
+            .iter()
+            .position(|tile| tile.get_id() == tile_id)
+        else {
+            return false;
+        };
+
+        let chosen = self.possible.swap_remove(index);
+
+        self.possible.clear();
+        self.possible.push(chosen);
+        self.update_entropy();
+
+        true
     }
 
+    /// Narrows this cell to one tile, drawn by weight. Does nothing when the cell
+    /// has already collapsed, or when every remaining tile has weight zero.
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
-        if self.entropy > 1 {
-            self.possible.sort_by_key(|a| a.get_id());
-
-            let chosen_id = self
-                .possible
-                .choose_weighted(rng, |v| v.get_weight())
-                .unwrap()
-                .get_id();
-
-            let chosen_index = self.possible.iter().position(|v| v.get_id() == chosen_id);
-
-            if let Some(pos) = chosen_index {
-                let chosen = self.possible.swap_remove(pos);
-
-                self.possible.clear();
-                self.possible.push(chosen);
-            }
-
-            self.update_entropy();
+        if self.entropy <= 1 {
+            return;
         }
+
+        // Sorted so a seed picks the same tile whatever order propagation left
+        // the possibilities in.
+        self.possible.sort_by_key(|tile| tile.get_id());
+
+        let Ok(chosen) = self.possible.choose_weighted(rng, |tile| tile.get_weight()) else {
+            return;
+        };
+        let chosen = Arc::clone(chosen);
+
+        self.possible.clear();
+        self.possible.push(chosen);
+        self.update_entropy();
     }
 
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {

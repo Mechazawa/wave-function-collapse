@@ -132,24 +132,42 @@ where
     }
 
     fn tick_cell(&mut self, x: usize, y: usize) {
-        if self.grid.get(x, y).unwrap().entropy() == 1 {
+        if self
+            .grid
+            .get(x, y)
+            .expect("position came from the grid")
+            .entropy()
+            == 1
+        {
             return;
         }
 
-        if self.data.get(x, y).unwrap().is_none() {
+        if self
+            .data
+            .get(x, y)
+            .expect("position came from the grid")
+            .is_none()
+        {
             let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
                 None => Set::default(),
                 Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
             });
 
-            self.data.set(x, y, Some(data)).unwrap();
+            self.data
+                .set(x, y, Some(data))
+                .expect("position came from the grid");
         }
 
-        let cell = self.grid.get_mut(x, y).unwrap();
+        let neighbors = self
+            .data
+            .replace(x, y, None)
+            .expect("position came from the grid")
+            .expect("the block above stores the neighbours when they are missing");
 
-        let neighbors = self.data.replace(x, y, None).unwrap().unwrap();
-
-        self.data.set(x, y, None).unwrap();
+        let cell = self
+            .grid
+            .get_mut(x, y)
+            .expect("position came from the grid");
         let old_entropy = cell.entropy();
 
         cell.tick(&neighbors);
@@ -176,7 +194,10 @@ where
     }
 
     fn collapse(&mut self, x: usize, y: usize) {
-        self.grid.get_mut(x, y).unwrap().collapse(&mut self.rng);
+        self.grid
+            .get_mut(x, y)
+            .expect("position came from the grid")
+            .collapse(&mut self.rng);
         self.collapsed.push(((x, y), CollapseReason::Explicit));
         self.mark(x, y);
     }
@@ -221,13 +242,13 @@ where
         let possible_states: Set<T::Identifier> = self
             .grid
             .get(cx, cy)
-            .unwrap()
+            .expect("position came from the grid")
             .possible
             .iter()
             .map(|t| t.get_id())
             .collect();
 
-        // Collect neighbor positions to avoid borrowing conflicts
+        // Collected up front so the loop below can borrow self.data mutably.
         let neighbor_positions: Vec<_> = self
             .data
             .get_neighbor_positions(cx, cy)
@@ -236,11 +257,17 @@ where
             .collect();
 
         for (direction, (x, y)) in neighbor_positions {
-            match self.data.get_mut(x, y).unwrap() {
+            match self
+                .data
+                .get_mut(x, y)
+                .expect("position came from the grid")
+            {
                 None => {
                     let mut neighbors: Neighbors<Set<T::Identifier>> = Neighbors::default();
                     neighbors[direction.invert()].clone_from(&possible_states);
-                    self.data.set(x, y, Some(neighbors)).unwrap();
+                    self.data
+                        .set(x, y, Some(neighbors))
+                        .expect("position came from the grid");
                     self.stack.push_back((x, y));
                 }
                 Some(neighbors) => {
@@ -284,11 +311,8 @@ where
     }
 
     fn reset(&mut self) {
-        for (x, y, cell) in &self.grid_base {
-            self.grid.set(x, y, cell.clone()).unwrap();
-            self.data.set(x, y, None).unwrap();
-        }
-
+        self.grid.clone_from(&self.grid_base);
+        self.data.reset_to_default();
         self.collapsed.clear();
         self.stack.clear();
     }
@@ -344,7 +368,7 @@ where
                         continue;
                     }
 
-                    board.set(x, y, true).unwrap();
+                    board.set(x, y, true).expect("position came from the grid");
 
                     board
                         .get_neighbor_positions(x, y)
@@ -368,18 +392,8 @@ where
         let explicit_collapsed: Vec<(Position, T::Identifier)> = self
             .collapsed
             .iter()
-            .filter(|(_, r)| *r == CollapseReason::Explicit)
-            .map(|(p, _)| *p)
-            .map(|(x, y)| {
-                (
-                    (x, y),
-                    self.grid
-                        .get(x, y)
-                        .and_then(|cell| Some(cell.collapsed()?.get_id())),
-                )
-            })
-            .filter(|(_, v)| v.is_some())
-            .map(|(p, v)| (p, v.unwrap()))
+            .filter(|(_, reason)| *reason == CollapseReason::Explicit)
+            .filter_map(|&((x, y), _)| Some(((x, y), self.grid.get(x, y)?.collapsed()?.get_id())))
             .collect();
 
         self.reset();

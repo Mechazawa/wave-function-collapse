@@ -5,6 +5,7 @@ use enum_map::EnumMap;
 
 #[cfg(feature = "image")]
 use {
+    crate::error::Error,
     crate::grid::{Direction, Grid, Size},
     enum_map::enum_map,
     fxhash::FxHashMap,
@@ -36,8 +37,13 @@ pub struct TileConfig {
 
 #[cfg(feature = "image")]
 impl Tile<DynamicImage> {
-    #[must_use]
-    pub fn from_config(configs: &[TileConfig]) -> Vec<Self> {
+    /// Builds a tile set from per-tile images and edge labels. Two tiles may sit
+    /// beside each other when one's edge label reads as the reverse of the other's.
+    ///
+    /// # Errors
+    /// [`Error::SlotCount`] when a config does not carry exactly four edge labels,
+    /// and [`Error::Io`] or [`Error::Image`] when one of the images will not load.
+    pub fn from_config(configs: &[TileConfig]) -> Result<Vec<Self>, Error> {
         let mut output = Vec::new();
         let mut slots: Vec<(u64, Neighbors<String>)> = Vec::new();
 
@@ -45,17 +51,20 @@ impl Tile<DynamicImage> {
         slots.reserve_exact(configs.len());
 
         for config in configs {
-            let neighbors = enum_map! {
-                Direction::Up => config.slots[0].clone(),
-                Direction::Right => config.slots[1].clone(),
-                Direction::Down => config.slots[2].clone(),
-                Direction::Left => config.slots[3].clone(),
+            let [up, right, down, left] = config.slots.as_slice() else {
+                return Err(Error::SlotCount {
+                    found: config.slots.len(),
+                });
             };
 
-            let image = ImageReader::open(config.image.as_path())
-                .unwrap()
-                .decode()
-                .unwrap();
+            let neighbors = enum_map! {
+                Direction::Up => up.clone(),
+                Direction::Right => right.clone(),
+                Direction::Down => down.clone(),
+                Direction::Left => left.clone(),
+            };
+
+            let image = ImageReader::open(config.image.as_path())?.decode()?;
             let tile = Self::new_image_tile(image);
 
             slots.push((tile.get_id(), neighbors));
@@ -75,14 +84,29 @@ impl Tile<DynamicImage> {
             }
         }
 
-        output
+        Ok(output)
     }
 
-    #[must_use]
-    pub fn from_image(image: &DynamicImage, tile_size: &Size) -> Vec<Self> {
+    /// Cuts a sample image into a grid of tiles, keeping one of each distinct tile
+    /// and weighting it by how often it appears. Adjacency comes from which tiles
+    /// touch in the sample. A sample whose sides are not whole multiples of the
+    /// tile size is cut short at the right and bottom edges.
+    ///
+    /// # Errors
+    /// [`Error::SampleTooSmall`] when the sample cannot hold even one tile.
+    pub fn from_image(image: &DynamicImage, tile_size: &Size) -> Result<Vec<Self>, Error> {
         let (image_width, image_height) = image.dimensions();
         let grid_width = image_width as usize / tile_size.width;
         let grid_height = image_height as usize / tile_size.height;
+
+        if grid_width == 0 || grid_height == 0 {
+            return Err(Error::SampleTooSmall {
+                sample_width: image_width,
+                sample_height: image_height,
+                tile_width: tile_size.width as u32,
+                tile_height: tile_size.height as u32,
+            });
+        }
 
         let mut unique: FxHashMap<u64, Self> = FxHashMap::default();
 
@@ -120,7 +144,9 @@ impl Tile<DynamicImage> {
         debug!("Populating neighbors");
 
         for (x, y, tile_id) in &grid {
-            let tile = unique.get_mut(tile_id).unwrap();
+            let tile = unique
+                .get_mut(tile_id)
+                .expect("every id in the grid was inserted while building it");
 
             for (direction, maybe) in grid.get_neighbors(x, y) {
                 if let Some(value) = maybe {
@@ -129,12 +155,9 @@ impl Tile<DynamicImage> {
             }
         }
 
-        // Convert HashMap values to Vec more efficiently
-        let output: Vec<Self> = unique.into_values().collect();
-
         // todo: Keep track of rotation
 
-        output
+        Ok(unique.into_values().collect())
     }
 
     #[must_use]

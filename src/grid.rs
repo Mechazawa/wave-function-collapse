@@ -1,3 +1,5 @@
+use crate::error::Error;
+
 use core::str::FromStr;
 use enum_map::{Enum, EnumMap, enum_map};
 use std::mem;
@@ -34,19 +36,16 @@ pub struct Size {
 }
 
 impl FromStr for Size {
-    type Err = String;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (raw_width, raw_height) = s.split_once('x').ok_or(format!("invalid format: {s}"))?;
+        let invalid = || Error::InvalidSize(s.to_string());
+        let (raw_width, raw_height) = s.split_once('x').ok_or_else(invalid)?;
 
-        let width = raw_width
-            .parse::<usize>()
-            .map_err(|_| format!("invalid width: {raw_width}"))?;
-        let height = raw_height
-            .parse::<usize>()
-            .map_err(|_| format!("invalid height: {raw_height}"))?;
-
-        Ok(Size { width, height })
+        Ok(Size {
+            width: raw_width.parse().map_err(|_| invalid())?,
+            height: raw_height.parse().map_err(|_| invalid())?,
+        })
     }
 }
 
@@ -143,15 +142,18 @@ where
     }
 
     /// # Errors
-    /// Returns an error if the coordinates are out of bounds.
-    pub fn set(&mut self, x: usize, y: usize, value: T) -> Result<(), &'static str> {
+    /// [`Error::OutOfBounds`] when the coordinates fall outside the grid.
+    pub fn set(&mut self, x: usize, y: usize, value: T) -> Result<(), Error> {
         if x >= self.width || y >= self.height {
-            Err("Cell out of range")?;
+            return Err(Error::OutOfBounds {
+                x,
+                y,
+                width: self.width,
+                height: self.height,
+            });
         }
 
-        let index = x + (y * self.width);
-
-        self.data[index] = value;
+        self.data[x + (y * self.width)] = value;
 
         Ok(())
     }
@@ -232,31 +234,7 @@ where
         self.height
     }
 
-    /// # Panics
-    /// Panics if accessing out of bounds coordinates.
-    #[must_use]
-    pub fn slice(&self, x: usize, y: usize, width: usize, height: usize) -> Grid<&T> {
-        Grid::new(
-            width.min(self.width() - x),
-            height.min(self.height() - y),
-            &mut |x, y| self.get(x, y).unwrap(),
-        )
-    }
-
-    #[must_use]
-    pub fn chunked(&self, chunk_width: usize, chunk_height: usize) -> Vec<Grid<&T>> {
-        let mut output = vec![];
-
-        for x in (0..self.width()).step_by(chunk_width) {
-            for y in (0..self.height()).step_by(chunk_height) {
-                output.push(self.slice(x, y, chunk_width, chunk_height));
-            }
-        }
-
-        output
-    }
-
-    /// Efficiently reset all grid cells to default value without reallocating
+    /// Restores every cell to its default without reallocating.
     pub fn reset_to_default(&mut self)
     where
         T: Default,

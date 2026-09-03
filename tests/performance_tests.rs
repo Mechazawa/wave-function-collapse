@@ -207,34 +207,49 @@ fn test_grid_creation_consistency() {
 
 #[cfg(feature = "image")]
 #[test]
-fn test_tile_from_image_consistency() {
-    use image::{DynamicImage, RgbaImage};
+fn tiles_from_a_checkerboard_dedupe_to_two_weighted_by_their_count() {
+    use image::{DynamicImage, Rgba, RgbaImage};
     use wave_function_collapse::Size;
 
-    // Create a test image with a simple pattern
-    let img_size = 32u32;
-    let tile_size = Size::uniform(8);
+    const TILE: u32 = 8;
+    const GRID: u32 = 4;
 
-    let image = DynamicImage::ImageRgba8(RgbaImage::from_fn(img_size, img_size, |x, y| {
-        // Create a checkerboard pattern
-        let checker = (x / 8 + y / 8) % 2;
-        if checker == 0 {
-            image::Rgba([255, 0, 0, 255]) // Red
+    let red = Rgba([255, 0, 0, 255]);
+    let green = Rgba([0, 255, 0, 255]);
+
+    let sample = DynamicImage::ImageRgba8(RgbaImage::from_fn(TILE * GRID, TILE * GRID, |x, y| {
+        if (x / TILE + y / TILE).is_multiple_of(2) {
+            red
         } else {
-            image::Rgba([0, 255, 0, 255]) // Green
+            green
         }
     }));
 
-    let tiles = Tile::<DynamicImage>::from_image(&image, &tile_size);
+    let tiles = Tile::<DynamicImage>::from_image(&sample, &Size::uniform(TILE as usize)).unwrap();
 
-    // Should create some unique tiles
-    assert!(!tiles.is_empty());
-    assert!(tiles.len() <= 16); // Max possible unique tiles for 4x4 grid
+    assert_eq!(
+        tiles.len(),
+        2,
+        "a two-colour checkerboard has two distinct tiles"
+    );
 
-    // Each tile should have valid neighbor relationships
-    for tile in &tiles {
-        assert!(tile.get_weight() > 0);
-    }
+    let mut weights: Vec<usize> = tiles.iter().map(Collapsable::get_weight).collect();
+    weights.sort_unstable();
+
+    let half = (GRID * GRID / 2) as usize;
+    assert_eq!(weights, vec![half, half], "each colour fills half the grid");
+}
+
+#[cfg(feature = "image")]
+#[test]
+fn a_sample_smaller_than_one_tile_is_rejected() {
+    use image::{DynamicImage, RgbaImage};
+    use wave_function_collapse::{Error, Size};
+
+    let sample = DynamicImage::ImageRgba8(RgbaImage::new(4, 40));
+    let result = Tile::<DynamicImage>::from_image(&sample, &Size::uniform(8));
+
+    assert!(matches!(result, Err(Error::SampleTooSmall { .. })));
 }
 
 #[test]

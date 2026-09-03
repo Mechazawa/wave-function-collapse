@@ -24,14 +24,15 @@ fn load_config(s: &str) -> Result<Vec<TileConfig>, String> {
     Ok(configs)
 }
 
-fn load_input(s: &str) -> Result<Input, &'static str> {
-    if let Ok(image) = load_image(s) {
-        Ok(Input::Image(image))
-    } else if let Ok(configs) = load_config(s) {
-        Ok(Input::Config(configs))
-    } else {
-        Err("Failed to load input")
-    }
+fn load_input(s: &str) -> Result<Input, String> {
+    let image_error = match load_image(s) {
+        Ok(image) => return Ok(Input::Image(image)),
+        Err(error) => error,
+    };
+
+    load_config(s).map(Input::Config).map_err(|config_error| {
+        format!("{s} is neither an image ({image_error}) nor a tile config ({config_error})")
+    })
 }
 
 #[derive(Debug)]

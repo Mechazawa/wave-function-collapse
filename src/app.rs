@@ -33,15 +33,13 @@ impl WfcApp {
     }
 
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // Load tiles
         let mut tiles = match &self.config.input {
             Input::Image(value) => Tile::from_image(value, &Size::uniform(self.config.input_size)),
             Input::Config(value) => Tile::from_config(value),
-        };
+        }?;
 
         info!("{} unique tiles found", tiles.len());
 
-        // Filter invalid tiles
         let invalid_neighbors = tiles
             .iter()
             .map(|t| t.neighbors.len())
@@ -59,7 +57,6 @@ impl WfcApp {
             warn!("Retained {} tiles", tiles.len());
         }
 
-        // Create WFC state
         let base_state = SuperState::new(tiles.iter().cloned().map(Arc::new).collect());
         let grid = Grid::new(
             self.config.output_size.width,
