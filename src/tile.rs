@@ -189,6 +189,14 @@ impl<T> Tile<T> {
         }
     }
 
+    /// Whether this tile can be placed at all. A tile with no allowed neighbour on
+    /// some side fails every constraint on that side, so it can never sit beside
+    /// anything and only costs the solver contradictions.
+    #[must_use]
+    pub fn is_placeable(&self) -> bool {
+        self.neighbors.values().all(|allowed| !allowed.is_empty())
+    }
+
     #[must_use]
     pub fn with_neighbors(
         id: u64,

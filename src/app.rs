@@ -40,21 +40,11 @@ impl WfcApp {
 
         info!("{} unique tiles found", tiles.len());
 
-        let invalid_neighbors = tiles
-            .iter()
-            .map(|t| t.neighbors.len())
-            .filter(|c| *c != 4)
-            .collect::<Vec<usize>>();
+        let unplaceable = tiles.iter().filter(|tile| !tile.is_placeable()).count();
 
-        if !invalid_neighbors.is_empty() {
-            warn!(
-                "Found {} tiles with invalid amount of neighbors: {:?}",
-                invalid_neighbors.len(),
-                invalid_neighbors
-            );
-
-            tiles.retain(|t| t.neighbors.len() == 4);
-            warn!("Retained {} tiles", tiles.len());
+        if unplaceable > 0 {
+            tiles.retain(Tile::is_placeable);
+            warn!("Dropped {unplaceable} tiles with no allowed neighbour on some side");
         }
 
         let base_state = SuperState::new(tiles.iter().cloned().map(Arc::new).collect());
