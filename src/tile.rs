@@ -71,14 +71,21 @@ impl Tile<DynamicImage> {
             output.push(tile);
         }
 
-        for index in 0..slots.len() {
-            for (id, neighbors) in &slots {
-                for (direction, key) in neighbors {
-                    let rev_key: String =
-                        slots[index].1[direction.invert()].chars().rev().collect();
+        // An edge label read backwards is what the tile facing it has to show.
+        let facing: Vec<Neighbors<String>> = slots
+            .iter()
+            .map(|(_, labels)| {
+                Neighbors::from_fn(|direction| labels[direction].chars().rev().collect())
+            })
+            .collect();
 
-                    if *key == rev_key {
-                        output[index].neighbors[direction].insert(*id);
+        for (tile, wanted) in output.iter_mut().zip(&facing) {
+            for (candidate_id, candidate_labels) in &slots {
+                for (side, candidate_label) in candidate_labels {
+                    // `side` is the candidate's own edge, so it touches this tile's
+                    // opposite side and belongs in that slot.
+                    if *candidate_label == wanted[side.invert()] {
+                        tile.neighbors[side.invert()].insert(*candidate_id);
                     }
                 }
             }
