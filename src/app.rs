@@ -8,10 +8,13 @@ use wave_function_collapse::wave::Wave;
 #[cfg(feature = "visual")]
 use crate::render::sdl_renderer::{SdlConfig, SdlRenderer};
 
-#[cfg(feature = "image-output")]
+#[cfg(feature = "image")]
 use crate::render::image_renderer::ImageRenderer;
 
-use image::{DynamicImage, GenericImageView};
+use image::DynamicImage;
+
+#[cfg(feature = "visual")]
+use image::GenericImageView;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{info, warn};
 use rand::Rng;
@@ -19,7 +22,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 type RendererVec = Vec<Box<dyn Renderer<DynamicImage, Error = String>>>;
-type RendererResult = Result<RendererVec, Box<dyn std::error::Error>>;
 
 pub struct WfcApp {
     config: AppConfig,
@@ -81,8 +83,34 @@ impl WfcApp {
 
         let mut wfc = Wave::new(grid, seed);
 
-        // Set up renderers (now that we have tiles with actual dimensions)
-        let mut renderers = self.create_renderers(&tiles)?;
+        let mut renderers: RendererVec = Vec::new();
+
+        #[cfg(feature = "visual")]
+        if self.config.renderer.visual
+            && let Some(first_tile) = tiles.first()
+        {
+            let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
+
+            let sdl_config = SdlConfig {
+                window_size: Size {
+                    width: self.config.output_size.width * tile_width as usize,
+                    height: self.config.output_size.height * tile_height as usize,
+                },
+                vsync: self.config.renderer.vsync,
+                fullscreen: self.config.renderer.fullscreen,
+                show_debug: self.config.renderer.debug,
+                render_every_step: self.config.renderer.slow,
+            };
+
+            if let Ok(sdl_renderer) = SdlRenderer::new(&sdl_config) {
+                renderers.push(Box::new(sdl_renderer));
+            }
+        }
+
+        #[cfg(feature = "image")]
+        if let Some(output_path) = &self.config.output_path {
+            renderers.push(Box::new(ImageRenderer::new(output_path.clone())));
+        }
 
         // Initialize all renderers
         for renderer in &mut renderers {
@@ -150,45 +178,5 @@ impl WfcApp {
 
         info!("Generation completed");
         Ok(())
-    }
-
-    fn create_renderers(&self, tiles: &[Tile<DynamicImage>]) -> RendererResult {
-        let mut renderers: RendererVec = Vec::new();
-
-        // Add SDL2 renderer if requested
-        #[cfg(feature = "visual")]
-        if self.config.renderer.visual
-            && let Some(first_tile) = tiles.first()
-        {
-            // Get the actual tile dimensions
-            let (tile_width, tile_height) = first_tile.value.as_ref().dimensions();
-
-            // Calculate window size based on actual tile size
-            let window_size = Size {
-                width: self.config.output_size.width * tile_width as usize,
-                height: self.config.output_size.height * tile_height as usize,
-            };
-
-            let sdl_config = SdlConfig {
-                window_size,
-                vsync: self.config.renderer.vsync,
-                fullscreen: self.config.renderer.fullscreen,
-                show_debug: self.config.renderer.debug,
-                render_every_step: self.config.renderer.slow,
-            };
-
-            if let Ok(sdl_renderer) = SdlRenderer::new(&sdl_config) {
-                renderers.push(Box::new(sdl_renderer));
-            }
-        }
-
-        // Add image renderer if output path is specified
-        #[cfg(feature = "image-output")]
-        if let Some(output_path) = &self.config.output_path {
-            let image_renderer = ImageRenderer::new(output_path.clone());
-            renderers.push(Box::new(image_renderer));
-        }
-
-        Ok(renderers)
     }
 }

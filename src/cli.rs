@@ -40,19 +40,14 @@ pub enum Input {
     Config(Vec<TileConfig>),
 }
 
+#[cfg(feature = "visual")]
 #[derive(Debug)]
 pub struct RendererConfig {
-    #[cfg(feature = "visual")]
     pub visual: bool,
-    #[cfg(feature = "visual")]
     pub slow: bool,
-    #[cfg(feature = "visual")]
     pub debug: bool,
-    #[cfg(feature = "visual")]
     pub vsync: bool,
-    #[cfg(feature = "visual")]
     pub fullscreen: bool,
-    #[cfg(feature = "visual")]
     pub hold: Option<f32>,
 }
 
@@ -64,6 +59,7 @@ pub struct AppConfig {
     pub output_path: Option<PathBuf>,
     #[cfg(not(feature = "threaded"))]
     pub seed: Option<u64>,
+    #[cfg(feature = "visual")]
     pub renderer: RendererConfig,
 }
 
@@ -141,18 +137,13 @@ impl Opt {
             output_path: self.output,
             #[cfg(not(feature = "threaded"))]
             seed: self.seed,
+            #[cfg(feature = "visual")]
             renderer: RendererConfig {
-                #[cfg(feature = "visual")]
                 visual: self.visual,
-                #[cfg(feature = "visual")]
                 slow: self.slow,
-                #[cfg(feature = "visual")]
                 debug: self.debug,
-                #[cfg(feature = "visual")]
                 vsync: self.vsync,
-                #[cfg(feature = "visual")]
                 fullscreen: self.fullscreen,
-                #[cfg(feature = "visual")]
                 hold: self.hold,
             },
         })

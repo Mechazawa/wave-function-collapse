@@ -1,7 +1,7 @@
 #[cfg(feature = "visual")]
 pub mod sdl_renderer;
 
-#[cfg(feature = "image-output")]
+#[cfg(feature = "image")]
 pub mod image_renderer;
 
 use wave_function_collapse::tile::Tile;

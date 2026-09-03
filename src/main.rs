@@ -2,7 +2,6 @@ mod app;
 mod cli;
 mod render;
 
-#[cfg(feature = "image-input")]
 fn main() {
     use app::WfcApp;
     use cli::Opt;

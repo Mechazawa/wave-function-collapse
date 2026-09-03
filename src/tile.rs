@@ -1,32 +1,20 @@
-use crate::grid::Direction;
-use crate::grid::Grid;
 use crate::grid::Neighbors;
-use crate::grid::Size;
 use crate::superstate::Collapsable;
 use crate::wave::Set;
+use enum_map::EnumMap;
 
-use enum_map::{EnumMap, enum_map};
-use log::debug;
-
-#[cfg(feature = "image-input")]
-mod image_imports {
-    pub use fxhash::FxHashMap;
-    pub use image::DynamicImage;
-    pub use image::GenericImageView;
-    pub use image::ImageBuffer;
-    pub use image::ImageReader;
-    pub use image::Pixel;
-    pub use num_traits::cast::ToPrimitive;
-    pub use serde::Deserialize;
-    pub use std::collections::hash_map::{DefaultHasher, Entry};
-    pub use std::hash::Hasher;
-    pub use std::path::PathBuf;
-}
-
-#[cfg(feature = "image-input")]
-use image_imports::{
-    DefaultHasher, Deserialize, DynamicImage, Entry, FxHashMap, GenericImageView, Hasher,
-    ImageBuffer, ImageReader, PathBuf, Pixel, ToPrimitive,
+#[cfg(feature = "image")]
+use {
+    crate::grid::{Direction, Grid, Size},
+    enum_map::enum_map,
+    fxhash::FxHashMap,
+    image::{DynamicImage, GenericImageView, ImageBuffer, ImageReader, Pixel},
+    log::debug,
+    num_traits::cast::ToPrimitive,
+    serde::Deserialize,
+    std::collections::hash_map::{DefaultHasher, Entry},
+    std::hash::Hasher,
+    std::path::PathBuf,
 };
 
 #[derive(Debug, Clone)]
@@ -39,14 +27,14 @@ pub struct Tile<T> {
     pub weight: usize,
 }
 
-#[cfg(feature = "image-input")]
+#[cfg(feature = "image")]
 #[derive(Debug, Deserialize)]
 pub struct TileConfig {
     pub image: PathBuf,
     pub slots: Vec<String>,
 }
 
-#[cfg(feature = "image-input")]
+#[cfg(feature = "image")]
 impl Tile<DynamicImage> {
     #[must_use]
     pub fn from_config(configs: &[TileConfig]) -> Vec<Self> {

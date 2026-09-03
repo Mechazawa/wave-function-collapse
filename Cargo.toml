@@ -9,19 +9,38 @@ license = "CC0"
 [dependencies]
 enum-map = "2.5"
 fxhash = "0.2"
-image = { version = "0.25.8", optional = true }
-indicatif = "0.18.0"
 log = "0.4"
-num-traits = "0.2"
-rand = "0.9.2"
+rand = { version = "0.9.2", default-features = false, features = ["alloc"] }
 rand_xorshift = "0.4.0"
-rayon = { version = "1.7.0", optional = true }
-sdl2 = { version = "0.38.0", features = ["image", "unsafe_textures"], optional = true }
+
+# image
+# Sample images the CLI is likely to be handed. Dropping the default set keeps
+# rav1e, ravif, exr, tiff, webp and rayon out of the build; a consumer who needs
+# one of those enables it on their own `image` dependency and cargo unifies it.
+image = { version = "0.25.8", default-features = false, features = [
+    "bmp",
+    "gif",
+    "jpeg",
+    "png",
+], optional = true }
+num-traits = { version = "0.2", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
+
+# threaded
+rayon = { version = "1.7.0", optional = true }
+
+# cli
+indicatif = { version = "0.18.0", optional = true }
 serde_json = { version = "1.0", optional = true }
-simplelog = { version = "0.12", features = ["paris"] }
-structopt = "0.3"
-structopt-flags = "0.3"
+simplelog = { version = "0.12", features = ["paris"], optional = true }
+structopt = { version = "0.3", optional = true }
+structopt-flags = { version = "0.3", optional = true }
+
+# visual
+sdl2 = { version = "0.38.0", features = [
+    "image",
+    "unsafe_textures",
+], optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["html_reports"] }
@@ -37,19 +56,31 @@ path = "src/lib.rs"
 [[bin]]
 name = "wave-function-collapse"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [features]
-default = ["image-output", "visual"]
+default = ["cli", "image", "visual"]
 
-# Core features
-image-input = ["dep:image", "dep:serde", "dep:serde_json"]
-image-output = ["image-input"]
-visual = ["image-input", "dep:sdl2"]
+# Tiles carrying image data: extraction from a sample image, JSON tile configs,
+# and composing a finished wave back into an image.
+image = ["dep:image", "dep:num-traits", "dep:serde"]
+
+# Spread the possibility filter over threads.
 threaded = ["dep:rayon"]
 
-# Convenience aliases
-image = ["image-input"]  # Backward compatibility
-sdl2 = ["visual"]        # Backward compatibility
+# The command line binary. Required by [[bin]].
+cli = [
+    "image",
+    "dep:indicatif",
+    "dep:serde_json",
+    "dep:simplelog",
+    "dep:structopt",
+    "dep:structopt-flags",
+    "rand/thread_rng",
+]
+
+# Live SDL2 window showing the wave as it collapses.
+visual = ["cli", "dep:sdl2"]
 
 [profile.release]
 lto = "fat"
