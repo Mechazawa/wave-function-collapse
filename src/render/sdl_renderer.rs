@@ -217,9 +217,7 @@ impl Renderer<DynamicImage> for SdlRenderer {
 
         self.frame_counter += 1;
 
-        // Render every frame if render_every_step is true (slow mode)
-        // Otherwise render every 10 frames to show progress without being too slow
-        if self.render_every_step || (self.frame_counter % 10 == 0) {
+        if self.render_every_step || self.frame_counter.is_multiple_of(10) {
             self.render_grid_from_wfc(wfc)?;
         }
         Ok(())

@@ -337,10 +337,7 @@ where
         self.reset();
 
         for ((x, y), id) in explicit_collapsed {
-            let coerced = self
-                .grid
-                .get_mut(x, y)
-                .map_or(false, |cell| cell.coerce(id));
+            let coerced = self.grid.get_mut(x, y).is_some_and(|cell| cell.coerce(id));
 
             if !coerced {
                 warn!("Failed to coerce cell at ({x}, {y})");

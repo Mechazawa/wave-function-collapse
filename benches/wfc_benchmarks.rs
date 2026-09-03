@@ -5,10 +5,6 @@ use std::sync::Arc;
 
 use wave_function_collapse::{grid::Grid, superstate::SuperState, tile::Tile, wave::Wave};
 
-#[cfg(feature = "image")]
-use image::DynamicImage;
-
-// Fixed seed for deterministic benchmarks
 const BENCHMARK_SEED: u64 = 12345;
 
 fn create_test_tiles() -> Vec<Tile<u32>> {
