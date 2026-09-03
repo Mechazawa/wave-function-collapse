@@ -180,14 +180,14 @@ impl Solver {
         Ok(solver)
     }
 
-    /// Solves for at most `budget_ms` of wall clock, then hands control back so the
+    /// Solves for at most `budget` milliseconds of wall clock, then hands control back so the
     /// caller can draw and yield. `true` once the wave is finished.
     #[wasm_bindgen(js_name = stepFor)]
-    pub fn step_for(&mut self, budget_ms: f64) -> bool {
+    pub fn step_for(&mut self, budget: f64) -> bool {
         /// Reading the clock per unit of work would cost more than the work does.
         const BETWEEN_CLOCK_READS: usize = 256;
 
-        let deadline = now() + budget_ms.max(0.0);
+        let deadline = now() + budget.max(0.0);
         let mut taken = 0;
 
         loop {
@@ -209,11 +209,12 @@ impl Solver {
         self.finish_step(taken)
     }
 
-    /// Solves the whole wave without yielding. Call it from a worker, or for a grid
-    /// small enough that one blocked frame does not show.
-    pub fn run(&mut self) -> bool {
+    /// Solves the whole wave without yielding, giving up after `restartBudget`
+    /// restarts. Call it from a worker, or for a grid small enough that one blocked
+    /// frame does not show.
+    pub fn run(&mut self, restart_budget: u32) -> bool {
         let before = self.wave.remaining();
-        self.wave.run();
+        self.wave.run(restart_budget as usize);
 
         self.finish_step(before - self.wave.remaining())
     }
@@ -285,6 +286,14 @@ impl Solver {
     #[wasm_bindgen(getter)]
     pub fn done(&self) -> bool {
         self.wave.done()
+    }
+
+    /// How many times the solver gave up on rolling back and started the grid over.
+    /// A tile set that cannot tile the grid drives this up and never finishes.
+    #[must_use]
+    #[wasm_bindgen(getter)]
+    pub fn restarts(&self) -> u32 {
+        u32::try_from(self.wave.restarts()).unwrap_or(u32::MAX)
     }
 
     #[must_use]

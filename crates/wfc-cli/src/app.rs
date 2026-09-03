@@ -154,6 +154,12 @@ impl WfcApp {
                 warn!("Unable to make progress, stopping early");
                 break;
             }
+
+            if wfc.restarts() > self.config.max_restarts {
+                return Err(Error::Unsolvable {
+                    restarts: wfc.restarts(),
+                });
+            }
         }
 
         progress.finish();

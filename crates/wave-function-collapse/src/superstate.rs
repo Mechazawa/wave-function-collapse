@@ -127,8 +127,11 @@ where
         self.update_entropy();
     }
 
+    /// Drops every possibility the neighbours forbid. Runs on a collapsed cell as
+    /// well, so a last possibility that a neighbour has since ruled out is caught
+    /// rather than left standing.
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
-        if self.entropy > 1 {
+        if self.entropy > 0 {
             #[cfg(feature = "threaded")]
             if self.entropy > *PAR_MIN_LEN {
                 self.possible = self

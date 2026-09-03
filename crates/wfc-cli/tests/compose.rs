@@ -56,7 +56,7 @@ fn open_cells_stay_transparent() {
 #[test]
 fn each_cell_lands_at_its_own_offset() {
     let mut wave = wave(6, 6, colour_tiles(5));
-    wave.run();
+    wave.run(0);
 
     assert!(
         wave.done(),

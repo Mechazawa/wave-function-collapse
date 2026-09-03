@@ -30,6 +30,7 @@ where
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
     seed: u64,
+    restarts: usize,
     last_rollback: usize,
     rollback_penalty: f64,
 }
@@ -48,6 +49,7 @@ where
             grid,
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
             seed,
+            restarts: 0,
             last_rollback: 0,
             rollback_penalty: 0.0,
         }
@@ -86,6 +88,14 @@ where
         self.seed
     }
 
+    /// How many times rolling back was not enough and the grid had to be thrown
+    /// away and started over. A tile set that cannot tile the grid drives this up
+    /// without ever finishing, so a caller that cannot wait forever should watch it.
+    #[must_use]
+    pub fn restarts(&self) -> usize {
+        self.restarts
+    }
+
     #[must_use]
     pub fn done(&self) -> bool {
         self.remaining() == 0
@@ -115,16 +125,21 @@ where
             .count()
     }
 
-    /// Collapses the whole wave. Returns early when no cell can be collapsed, so
-    /// check `done` to tell a solved wave from a stuck one.
-    pub fn run(&mut self) {
-        while !self.done() && self.tick() {}
+    /// Collapses the whole wave, giving up once the grid has been thrown away and
+    /// started over `restart_budget` times. Check `done` to tell a solved wave from
+    /// one this tile set cannot fill.
+    ///
+    /// A budget is required because a tile set that cannot tile the grid makes the
+    /// solver restart forever, always making some progress and always losing it.
+    pub fn run(&mut self, restart_budget: usize) {
+        while !self.done() && self.restarts <= restart_budget && self.tick() {}
     }
 
     /// Starts over from the untouched grid with a new seed, keeping the tile set.
     pub fn reseed(&mut self, seed: u64) {
         self.rng = Box::new(XorShiftRng::seed_from_u64(seed));
         self.seed = seed;
+        self.restarts = 0;
         self.last_rollback = 0;
         self.rollback_penalty = 0.0;
         self.reset();
@@ -140,17 +155,11 @@ where
         }
     }
 
+    /// Narrows one cell against what its neighbours still allow. A cell that has
+    /// already collapsed is checked too: if a neighbour has since collapsed to
+    /// something this cell forbids, its last possibility drops and the
+    /// contradiction has to be rolled back.
     fn tick_cell(&mut self, x: usize, y: usize) {
-        if self
-            .grid
-            .get(x, y)
-            .expect("position came from the grid")
-            .entropy()
-            == 1
-        {
-            return;
-        }
-
         if self
             .data
             .get(x, y)
@@ -181,32 +190,51 @@ where
 
         cell.tick(&neighbors);
 
-        if cell.entropy() <= 1 {
+        let entropy = cell.entropy();
+        let collapsing = cell.collapsing();
+
+        // Counted once, on the step where the cell becomes uniquely determined.
+        if old_entropy > 1 && entropy == 1 {
             self.collapsed.push(((x, y), CollapseReason::Implicit));
         }
 
-        if cell.entropy() == 0 {
+        if entropy == 0 {
             self.smart_rollback();
-        } else if old_entropy != cell.entropy() {
-            if cell.collapsing()
-                && self
-                    .grid
-                    .get_neighbors(x, y)
-                    .values()
-                    .all(|v| v.map(|v| !v.collapsing()).unwrap_or(true))
-            {
-                self.collapse(x, y);
-            } else {
-                self.mark(x, y);
-            }
+            return;
+        }
+
+        if entropy == old_entropy {
+            return;
+        }
+
+        // Collapsing a cell whose neighbours are all still untouched costs nothing
+        // to undo, so take it now instead of queueing more propagation.
+        let free_to_collapse = entropy > 1
+            && collapsing
+            && self
+                .grid
+                .get_neighbors(x, y)
+                .values()
+                .all(|neighbour| neighbour.is_none_or(|cell| !cell.collapsing()));
+
+        if free_to_collapse {
+            self.collapse(x, y);
+        } else {
+            self.mark(x, y);
         }
     }
 
     fn collapse(&mut self, x: usize, y: usize) {
-        self.grid
+        let cell = self
+            .grid
             .get_mut(x, y)
-            .expect("position came from the grid")
-            .collapse(&mut self.rng);
+            .expect("position came from the grid");
+
+        if cell.entropy() <= 1 {
+            return;
+        }
+
+        cell.collapse(&mut self.rng);
         self.collapsed.push(((x, y), CollapseReason::Explicit));
         self.mark(x, y);
     }
@@ -309,6 +337,7 @@ where
         if collapsed_count < self.rollback_penalty.ceil() as usize {
             warn!("Unable to solve, resetting...");
 
+            self.restarts += 1;
             self.reset();
             self.reset_rollback_penalty();
         } else {

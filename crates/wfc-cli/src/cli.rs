@@ -59,6 +59,7 @@ pub struct AppConfig {
     pub input_size: Option<usize>,
     pub output_size: Size,
     pub output_path: Option<PathBuf>,
+    pub max_restarts: usize,
     #[cfg(not(feature = "threaded"))]
     pub seed: Option<u64>,
     #[cfg(feature = "visual")]
@@ -91,6 +92,10 @@ pub struct Opt {
     /// Output image grid size
     #[arg(short, long, default_value = "20x20")]
     output_size: Size,
+
+    /// Give up after the grid has been thrown away and restarted this many times
+    #[arg(long, default_value_t = 100)]
+    max_restarts: usize,
 
     /// Random seed
     #[cfg(not(feature = "threaded"))]
@@ -153,6 +158,7 @@ impl Opt {
             input_size: self.input_size,
             output_size: self.output_size,
             output_path: self.output,
+            max_restarts: self.max_restarts,
             #[cfg(not(feature = "threaded"))]
             seed: self.seed,
             #[cfg(feature = "visual")]

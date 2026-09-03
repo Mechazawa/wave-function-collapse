@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Wave function collapse solver</title>
+        <style>
+            :root {
+                color-scheme: dark;
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            body {
+                margin: 0;
+                padding: 1.5rem;
+                background: #16161c;
+                color: #d8d8e0;
+                display: grid;
+                gap: 1rem;
+                justify-items: start;
+            }
+
+            h1 {
+                font-size: 1rem;
+                font-weight: 600;
+                margin: 0;
+            }
+
+            p {
+                margin: 0;
+                max-width: 60ch;
+                color: #9a9aa8;
+                line-height: 1.5;
+            }
+
+            fieldset {
+                border: 1px solid #33333f;
+                border-radius: 4px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.75rem;
+                align-items: center;
+                margin: 0;
+            }
+
+            label {
+                display: flex;
+                gap: 0.35rem;
+                align-items: center;
+            }
+
+            input {
+                background: #1f1f27;
+                color: inherit;
+                border: 1px solid #33333f;
+                border-radius: 3px;
+                padding: 0.25rem 0.4rem;
+                font: inherit;
+                width: 5rem;
+            }
+
+            input[type="range"] {
+                width: 8rem;
+            }
+
+            button {
+                background: #2a2a35;
+                color: inherit;
+                border: 1px solid #3d3d4a;
+                border-radius: 3px;
+                padding: 0.3rem 0.7rem;
+                font: inherit;
+                cursor: pointer;
+            }
+
+            button:hover {
+                background: #34344180;
+            }
+
+            #readout {
+                color: #9a9aa8;
+                white-space: pre;
+            }
+
+            canvas {
+                border: 1px solid #33333f;
+                border-radius: 4px;
+                image-rendering: pixelated;
+                max-width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Wave function collapse solver</h1>
+
+        <p>
+            The wasm module holds the solver and nothing else. It takes tile
+            definitions, indices and weights, and hands back which tile landed in
+            each cell. The tiles here are drawn on a canvas by the page, and the
+            page owns the animation loop: each frame asks the solver for a few
+            milliseconds of work, then redraws only the cells that changed.
+        </p>
+
+        <fieldset>
+            <label>width <input id="width" type="number" min="1" max="400" value="40" /></label>
+            <label>height <input id="height" type="number" min="1" max="400" value="24" /></label>
+            <label>seed <input id="seed" type="text" placeholder="random" /></label>
+            <label>
+                ms per frame
+                <input id="budget" type="range" min="1" max="32" value="8" />
+            </label>
+            <button id="generate" type="button">Generate</button>
+            <button id="reroll" type="button">Reroll</button>
+            <button id="once" type="button">Step once</button>
+            <button id="stop" type="button">Stop</button>
+        </fieldset>
+
+        <div id="readout"></div>
+
+        <canvas id="board"></canvas>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

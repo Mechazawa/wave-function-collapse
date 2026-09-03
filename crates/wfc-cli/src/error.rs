@@ -36,6 +36,12 @@ pub enum Error {
     #[error("the tile set is empty")]
     NoTiles,
 
+    #[error(
+        "gave up after restarting {restarts} times; this tile set may not be able to \
+         fill a grid this size, or --max-restarts needs raising"
+    )]
+    Unsolvable { restarts: usize },
+
     #[error(transparent)]
     Wfc(#[from] wave_function_collapse::Error),
 
