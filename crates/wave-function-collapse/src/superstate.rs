@@ -6,22 +6,20 @@ use std::{hash::Hash, sync::Arc};
 
 #[cfg(feature = "threaded")]
 use {
-    lazy_static::lazy_static, log::trace, rayon::prelude::IntoParallelRefIterator,
-    rayon::prelude::ParallelIterator,
+    log::trace, rayon::prelude::IntoParallelRefIterator, rayon::prelude::ParallelIterator,
+    std::sync::LazyLock,
 };
 
 #[cfg(feature = "threaded")]
-lazy_static! {
-    static ref PAR_MIN_LEN: usize = {
-        let workload_size: f32 = 20.0; // todo tune
-        let num_threads = rayon::current_num_threads();
-        let min_len = (workload_size * num_threads as f32).ceil() as usize;
+/// Entropy below which spreading the possibility filter over threads costs more than
+/// it saves. The per-thread figure is a guess, not a measurement.
+static PAR_MIN_LEN: LazyLock<usize> = LazyLock::new(|| {
+    let min_len = 20 * rayon::current_num_threads();
 
-        trace!("Min workload size before threading: {min_len}");
+    trace!("Min workload size before threading: {min_len}");
 
-        min_len
-    };
-}
+    min_len
+});
 
 pub trait Collapsable: Clone + Sync + Send {
     type Identifier: Clone + Eq + Hash + Ord + Sync + Send;
@@ -84,50 +82,56 @@ where
         }
     }
 
+    /// Narrows this cell to one named tile. `false` when the cell has already
+    /// collapsed or no longer holds that tile as a possibility.
     pub fn coerce(&mut self, tile_id: T::Identifier) -> bool {
-        if self.entropy > 1 {
-            let chosen_index = self.possible.iter().position(|v| v.get_id() == tile_id);
-
-            if let Some(pos) = chosen_index {
-                let chosen = self.possible.swap_remove(pos);
-
-                self.possible.clear();
-                self.possible.push(chosen);
-            }
-
-            self.update_entropy();
-
-            chosen_index.is_some()
-        } else {
-            false
+        if self.entropy <= 1 {
+            return false;
         }
+
+        let Some(index) = self
+            .possible
+            .iter()
+            .position(|tile| tile.get_id() == tile_id)
+        else {
+            return false;
+        };
+
+        let chosen = self.possible.swap_remove(index);
+
+        self.possible.clear();
+        self.possible.push(chosen);
+        self.update_entropy();
+
+        true
     }
 
+    /// Narrows this cell to one tile, drawn by weight. Does nothing when the cell
+    /// has already collapsed, or when every remaining tile has weight zero.
     pub fn collapse(&mut self, rng: &mut dyn RngCore) {
-        if self.entropy > 1 {
-            self.possible.sort_by_key(|a| a.get_id());
-
-            let chosen_id = self
-                .possible
-                .choose_weighted(rng, |v| v.get_weight())
-                .unwrap()
-                .get_id();
-
-            let chosen_index = self.possible.iter().position(|v| v.get_id() == chosen_id);
-
-            if let Some(pos) = chosen_index {
-                let chosen = self.possible.swap_remove(pos);
-
-                self.possible.clear();
-                self.possible.push(chosen);
-            }
-
-            self.update_entropy();
+        if self.entropy <= 1 {
+            return;
         }
+
+        // Sorted so a seed picks the same tile whatever order propagation left
+        // the possibilities in.
+        self.possible.sort_by_key(|tile| tile.get_id());
+
+        let Ok(chosen) = self.possible.choose_weighted(rng, |tile| tile.get_weight()) else {
+            return;
+        };
+        let chosen = Arc::clone(chosen);
+
+        self.possible.clear();
+        self.possible.push(chosen);
+        self.update_entropy();
     }
 
+    /// Drops every possibility the neighbours forbid. Runs on a collapsed cell as
+    /// well, so a last possibility that a neighbour has since ruled out is caught
+    /// rather than left standing.
     pub fn tick(&mut self, neighbors: &Neighbors<Set<T::Identifier>>) {
-        if self.entropy > 1 {
+        if self.entropy > 0 {
             #[cfg(feature = "threaded")]
             if self.entropy > *PAR_MIN_LEN {
                 self.possible = self

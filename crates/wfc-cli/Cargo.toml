@@ -1,0 +1,49 @@
+[package]
+name = "wfc-cli"
+version = "2.0.0"
+description = "Command line wave function collapse image generator"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "wfc"
+path = "src/main.rs"
+
+[dependencies]
+wave-function-collapse.workspace = true
+
+clap = { version = "4.5", features = ["derive"] }
+clap-verbosity-flag = "3.0"
+clap_complete = "4.5"
+enum-map.workspace = true
+fxhash.workspace = true
+# Sample formats a user is likely to hand the tool. The default set adds rav1e,
+# ravif, exr, tiff, webp and rayon, none of which a sample image needs.
+image = { workspace = true, features = ["bmp", "gif", "jpeg", "png"] }
+indicatif = "0.18.0"
+log = "0.4"
+num-traits = "0.2"
+rand = { workspace = true, features = ["thread_rng"] }
+serde.workspace = true
+serde_json = "1.0"
+simplelog = { version = "0.12", features = ["paris"] }
+thiserror.workspace = true
+
+sdl2 = { version = "0.38.0", features = [
+    "image",
+    "unsafe_textures",
+], optional = true }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[features]
+default = ["visual"]
+
+# Live SDL2 window showing the wave as it collapses.
+visual = ["dep:sdl2"]
+
+# Forwarded so `cargo build --features threaded` at the workspace root reaches the
+# algorithm.
+threaded = ["wave-function-collapse/threaded"]

@@ -1,34 +1,36 @@
 use std::sync::Arc;
 use wave_function_collapse::{
-    grid::{Direction, Grid},
-    superstate::{Collapsable, SuperState},
-    tile::Tile,
-    wave::Wave,
+    Collapsable, Direction, Grid, Neighbors, Set, SuperState, Tile, Wave,
 };
 
 // Fixed seed for deterministic tests
 const TEST_SEED: u64 = 42;
 
+/// Tile i accepts the two ids either side of it as well as itself. The window is
+/// symmetric, so "i allows j" and "j allows i" agree and the set can tile any grid
+/// in many ways, which is what a solver test wants.
 fn create_test_tiles(count: usize) -> Vec<Tile<u32>> {
-    let mut tiles = Vec::with_capacity(count);
+    (0..count)
+        .map(|i| {
+            let mut tile = Tile::new(i as u64, i as u32);
 
-    for i in 0..count {
-        let mut tile = Tile::new(i as u64, i as u32);
+            for offset in [count - 1, 0, 1] {
+                let id = ((i + offset) % count) as u64;
 
-        // Create realistic neighbor constraints
-        for neighbor_id in 0..(count.min(4)) {
-            let id = ((i + neighbor_id) % count) as u64;
-            tile.neighbors[Direction::Up].insert(id);
-            tile.neighbors[Direction::Right].insert(id);
-            tile.neighbors[Direction::Down].insert(id);
-            tile.neighbors[Direction::Left].insert(id);
-        }
+                for direction in [
+                    Direction::Up,
+                    Direction::Right,
+                    Direction::Down,
+                    Direction::Left,
+                ] {
+                    tile.neighbors[direction].insert(id);
+                }
+            }
 
-        tile.weight = (i % 5 + 1) * 10; // Varied weights
-        tiles.push(tile);
-    }
-
-    tiles
+            tile.weight = (i % 5 + 1) * 10;
+            tile
+        })
+        .collect()
 }
 
 fn create_test_wave(size: usize, tile_count: usize) -> Wave<Tile<u32>> {
@@ -51,15 +53,69 @@ fn test_maybe_collapse_correctness() {
     assert!(pos1.is_some());
     assert!(wave.remaining() < 25);
 
-    // Continue collapsing until done
-    let mut iterations = 0;
-    while !wave.done() && iterations < 100 {
-        wave.tick();
-        iterations += 1;
-    }
+    wave.run(100);
 
-    assert!(wave.done());
+    assert!(wave.done(), "restarted {} times", wave.restarts());
     assert_eq!(wave.remaining(), 0);
+}
+
+#[test]
+fn a_finished_wave_breaks_no_tile_rule() {
+    let tiles = create_test_tiles(8);
+    let mut wave = create_test_wave(9, 8);
+
+    wave.run(100);
+
+    assert!(wave.done(), "restarted {} times", wave.restarts());
+
+    for (x, y, cell) in wave.grid().iter() {
+        let placed = cell.collapsed().expect("a finished wave has no open cell");
+
+        let neighbours: Neighbors<Set<u64>> = Neighbors::from_fn(|direction| {
+            wave.grid()
+                .get_neighbor(x, y, direction)
+                .and_then(|neighbour| neighbour.collapsed())
+                .map(|tile| Set::from_iter([tile.get_id()]))
+                .unwrap_or_default()
+        });
+
+        assert!(
+            tiles[placed.get_id() as usize].test(&neighbours),
+            "cell ({x}, {y}) holds tile {} beside neighbours it forbids",
+            placed.get_id()
+        );
+    }
+}
+
+/// The rules read from both sides at once cannot be satisfied: a horizontal pair
+/// would need `a == (a + 2) % 3`. The solver has to keep restarting rather than
+/// report a layout that breaks them.
+#[test]
+fn an_impossible_tile_set_never_reports_done() {
+    let tiles: Vec<Tile<()>> = (0..3u64)
+        .map(|id| {
+            let next = Set::from_iter([(id + 1) % 3]);
+            let any: Set<u64> = (0..3).collect();
+
+            Tile::with_neighbors(
+                id,
+                (),
+                1,
+                Neighbors::from_fn(|direction| match direction {
+                    Direction::Left | Direction::Right => next.clone(),
+                    Direction::Up | Direction::Down => any.clone(),
+                }),
+            )
+        })
+        .collect();
+
+    let base = SuperState::new(tiles.into_iter().map(Arc::new).collect());
+    let mut wave = Wave::new(Grid::new(4, 1, &mut |_, _| base.clone()), TEST_SEED);
+
+    wave.run(20);
+
+    assert!(!wave.done());
+    assert!(wave.restarts() > 20, "it should keep restarting instead");
 }
 
 #[test]
@@ -202,38 +258,6 @@ fn test_grid_creation_consistency() {
         for y in 0..size {
             assert_eq!(grid.get(x, y), Some(&(x + y)));
         }
-    }
-}
-
-#[cfg(feature = "image")]
-#[test]
-fn test_tile_from_image_consistency() {
-    use image::{DynamicImage, RgbaImage};
-    use wave_function_collapse::Size;
-
-    // Create a test image with a simple pattern
-    let img_size = 32u32;
-    let tile_size = Size::uniform(8);
-
-    let image = DynamicImage::ImageRgba8(RgbaImage::from_fn(img_size, img_size, |x, y| {
-        // Create a checkerboard pattern
-        let checker = (x / 8 + y / 8) % 2;
-        if checker == 0 {
-            image::Rgba([255, 0, 0, 255]) // Red
-        } else {
-            image::Rgba([0, 255, 0, 255]) // Green
-        }
-    }));
-
-    let tiles = Tile::<DynamicImage>::from_image(&image, &tile_size);
-
-    // Should create some unique tiles
-    assert!(!tiles.is_empty());
-    assert!(tiles.len() <= 16); // Max possible unique tiles for 4x4 grid
-
-    // Each tile should have valid neighbor relationships
-    for tile in &tiles {
-        assert!(tile.get_weight() > 0);
     }
 }
 

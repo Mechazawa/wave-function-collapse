@@ -22,14 +22,15 @@ pub struct Wave<T>
 where
     T: Collapsable,
 {
-    pub grid: Grid<SuperState<T>>,
+    grid: Grid<SuperState<T>>,
     grid_base: Grid<SuperState<T>>,
     stack: VecDeque<Position>,
-    // todo tmp pub
-    pub data: Grid<CellNeighbors<T>>,
+    data: Grid<CellNeighbors<T>>,
     // todo remove the CollapseReason because it's unused
     collapsed: Vec<(Position, CollapseReason)>,
     rng: Box<dyn RngCore>,
+    seed: u64,
+    restarts: usize,
     last_rollback: usize,
     rollback_penalty: f64,
 }
@@ -47,9 +48,52 @@ where
             grid_base: grid.clone(),
             grid,
             rng: Box::new(XorShiftRng::seed_from_u64(seed)),
+            seed,
+            restarts: 0,
             last_rollback: 0,
             rollback_penalty: 0.0,
         }
+    }
+
+    #[must_use]
+    pub fn grid(&self) -> &Grid<SuperState<T>> {
+        &self.grid
+    }
+
+    #[must_use]
+    pub fn width(&self) -> usize {
+        self.grid.width()
+    }
+
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.grid.height()
+    }
+
+    /// The state every cell starts in, holding the whole tile set. `None` for an
+    /// empty grid.
+    #[must_use]
+    pub fn base_state(&self) -> Option<&SuperState<T>> {
+        self.grid_base.get(0, 0)
+    }
+
+    /// How many possibilities a cell starts with. Zero for an empty grid.
+    #[must_use]
+    pub fn base_entropy(&self) -> usize {
+        self.base_state().map_or(0, SuperState::base_entropy)
+    }
+
+    #[must_use]
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// How many times rolling back was not enough and the grid had to be thrown
+    /// away and started over. A tile set that cannot tile the grid drives this up
+    /// without ever finishing, so a caller that cannot wait forever should watch it.
+    #[must_use]
+    pub fn restarts(&self) -> usize {
+        self.restarts
     }
 
     #[must_use]
@@ -73,6 +117,34 @@ where
         worked || self.maybe_collapse().is_some()
     }
 
+    /// Advances at most `limit` units of work and returns how many ran. A shortfall
+    /// means the wave either finished or cannot collapse any cell.
+    pub fn step(&mut self, limit: usize) -> usize {
+        (0..limit)
+            .take_while(|_| self.tick_once().is_some())
+            .count()
+    }
+
+    /// Collapses the whole wave, giving up once the grid has been thrown away and
+    /// started over `restart_budget` times. Check `done` to tell a solved wave from
+    /// one this tile set cannot fill.
+    ///
+    /// A budget is required because a tile set that cannot tile the grid makes the
+    /// solver restart forever, always making some progress and always losing it.
+    pub fn run(&mut self, restart_budget: usize) {
+        while !self.done() && self.restarts <= restart_budget && self.tick() {}
+    }
+
+    /// Starts over from the untouched grid with a new seed, keeping the tile set.
+    pub fn reseed(&mut self, seed: u64) {
+        self.rng = Box::new(XorShiftRng::seed_from_u64(seed));
+        self.seed = seed;
+        self.restarts = 0;
+        self.last_rollback = 0;
+        self.rollback_penalty = 0.0;
+        self.reset();
+    }
+
     pub fn tick_once(&mut self) -> Option<Position> {
         if let Some((x, y)) = self.stack.pop_front() {
             self.tick_cell(x, y);
@@ -83,52 +155,86 @@ where
         }
     }
 
+    /// Narrows one cell against what its neighbours still allow. A cell that has
+    /// already collapsed is checked too: if a neighbour has since collapsed to
+    /// something this cell forbids, its last possibility drops and the
+    /// contradiction has to be rolled back.
     fn tick_cell(&mut self, x: usize, y: usize) {
-        if self.grid.get(x, y).unwrap().entropy() == 1 {
-            return;
-        }
-
-        if self.data.get(x, y).unwrap().is_none() {
+        if self
+            .data
+            .get(x, y)
+            .expect("position came from the grid")
+            .is_none()
+        {
             let data = self.grid.get_neighbors(x, y).map(|_, v| match v {
                 None => Set::default(),
                 Some(neighbor) => neighbor.possible.iter().map(|x| x.get_id()).collect(),
             });
 
-            self.data.set(x, y, Some(data)).unwrap();
+            self.data
+                .set(x, y, Some(data))
+                .expect("position came from the grid");
         }
 
-        let cell = self.grid.get_mut(x, y).unwrap();
+        let neighbors = self
+            .data
+            .replace(x, y, None)
+            .expect("position came from the grid")
+            .expect("the block above stores the neighbours when they are missing");
 
-        let neighbors = self.data.replace(x, y, None).unwrap().unwrap();
-
-        self.data.set(x, y, None).unwrap();
+        let cell = self
+            .grid
+            .get_mut(x, y)
+            .expect("position came from the grid");
         let old_entropy = cell.entropy();
 
         cell.tick(&neighbors);
 
-        if cell.entropy() <= 1 {
+        let entropy = cell.entropy();
+        let collapsing = cell.collapsing();
+
+        // Counted once, on the step where the cell becomes uniquely determined.
+        if old_entropy > 1 && entropy == 1 {
             self.collapsed.push(((x, y), CollapseReason::Implicit));
         }
 
-        if cell.entropy() == 0 {
+        if entropy == 0 {
             self.smart_rollback();
-        } else if old_entropy != cell.entropy() {
-            if cell.collapsing()
-                && self
-                    .grid
-                    .get_neighbors(x, y)
-                    .values()
-                    .all(|v| v.map(|v| !v.collapsing()).unwrap_or(true))
-            {
-                self.collapse(x, y);
-            } else {
-                self.mark(x, y);
-            }
+            return;
+        }
+
+        if entropy == old_entropy {
+            return;
+        }
+
+        // Collapsing a cell whose neighbours are all still untouched costs nothing
+        // to undo, so take it now instead of queueing more propagation.
+        let free_to_collapse = entropy > 1
+            && collapsing
+            && self
+                .grid
+                .get_neighbors(x, y)
+                .values()
+                .all(|neighbour| neighbour.is_none_or(|cell| !cell.collapsing()));
+
+        if free_to_collapse {
+            self.collapse(x, y);
+        } else {
+            self.mark(x, y);
         }
     }
 
     fn collapse(&mut self, x: usize, y: usize) {
-        self.grid.get_mut(x, y).unwrap().collapse(&mut self.rng);
+        let cell = self
+            .grid
+            .get_mut(x, y)
+            .expect("position came from the grid");
+
+        if cell.entropy() <= 1 {
+            return;
+        }
+
+        cell.collapse(&mut self.rng);
         self.collapsed.push(((x, y), CollapseReason::Explicit));
         self.mark(x, y);
     }
@@ -173,13 +279,13 @@ where
         let possible_states: Set<T::Identifier> = self
             .grid
             .get(cx, cy)
-            .unwrap()
+            .expect("position came from the grid")
             .possible
             .iter()
             .map(|t| t.get_id())
             .collect();
 
-        // Collect neighbor positions to avoid borrowing conflicts
+        // Collected up front so the loop below can borrow self.data mutably.
         let neighbor_positions: Vec<_> = self
             .data
             .get_neighbor_positions(cx, cy)
@@ -188,11 +294,17 @@ where
             .collect();
 
         for (direction, (x, y)) in neighbor_positions {
-            match self.data.get_mut(x, y).unwrap() {
+            match self
+                .data
+                .get_mut(x, y)
+                .expect("position came from the grid")
+            {
                 None => {
                     let mut neighbors: Neighbors<Set<T::Identifier>> = Neighbors::default();
                     neighbors[direction.invert()].clone_from(&possible_states);
-                    self.data.set(x, y, Some(neighbors)).unwrap();
+                    self.data
+                        .set(x, y, Some(neighbors))
+                        .expect("position came from the grid");
                     self.stack.push_back((x, y));
                 }
                 Some(neighbors) => {
@@ -225,6 +337,7 @@ where
         if collapsed_count < self.rollback_penalty.ceil() as usize {
             warn!("Unable to solve, resetting...");
 
+            self.restarts += 1;
             self.reset();
             self.reset_rollback_penalty();
         } else {
@@ -236,11 +349,8 @@ where
     }
 
     fn reset(&mut self) {
-        for (x, y, cell) in &self.grid_base {
-            self.grid.set(x, y, cell.clone()).unwrap();
-            self.data.set(x, y, None).unwrap();
-        }
-
+        self.grid.clone_from(&self.grid_base);
+        self.data.reset_to_default();
         self.collapsed.clear();
         self.stack.clear();
     }
@@ -296,7 +406,7 @@ where
                         continue;
                     }
 
-                    board.set(x, y, true).unwrap();
+                    board.set(x, y, true).expect("position came from the grid");
 
                     board
                         .get_neighbor_positions(x, y)
@@ -320,27 +430,14 @@ where
         let explicit_collapsed: Vec<(Position, T::Identifier)> = self
             .collapsed
             .iter()
-            .filter(|(_, r)| *r == CollapseReason::Explicit)
-            .map(|(p, _)| *p)
-            .map(|(x, y)| {
-                (
-                    (x, y),
-                    self.grid
-                        .get(x, y)
-                        .and_then(|cell| Some(cell.collapsed()?.get_id())),
-                )
-            })
-            .filter(|(_, v)| v.is_some())
-            .map(|(p, v)| (p, v.unwrap()))
+            .filter(|(_, reason)| *reason == CollapseReason::Explicit)
+            .filter_map(|&((x, y), _)| Some(((x, y), self.grid.get(x, y)?.collapsed()?.get_id())))
             .collect();
 
         self.reset();
 
         for ((x, y), id) in explicit_collapsed {
-            let coerced = self
-                .grid
-                .get_mut(x, y)
-                .map_or(false, |cell| cell.coerce(id));
+            let coerced = self.grid.get_mut(x, y).is_some_and(|cell| cell.coerce(id));
 
             if !coerced {
                 warn!("Failed to coerce cell at ({x}, {y})");

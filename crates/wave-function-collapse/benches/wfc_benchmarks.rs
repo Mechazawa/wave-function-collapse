@@ -5,10 +5,6 @@ use std::sync::Arc;
 
 use wave_function_collapse::{grid::Grid, superstate::SuperState, tile::Tile, wave::Wave};
 
-#[cfg(feature = "image")]
-use image::DynamicImage;
-
-// Fixed seed for deterministic benchmarks
 const BENCHMARK_SEED: u64 = 12345;
 
 fn create_test_tiles() -> Vec<Tile<u32>> {
@@ -140,28 +136,6 @@ fn bench_grid_operations(c: &mut Criterion) {
     group.finish();
 }
 
-#[cfg(feature = "image")]
-fn bench_tile_from_image(c: &mut Criterion) {
-    use image::{DynamicImage, RgbaImage};
-    use wave_function_collapse::grid::Size;
-
-    let mut group = c.benchmark_group("tile_from_image");
-
-    // Create test images of various sizes
-    for (name, img_size, tile_size) in
-        [("small", 64, 8), ("medium", 128, 16), ("large", 256, 32)].iter()
-    {
-        let image = DynamicImage::ImageRgba8(RgbaImage::new(*img_size, *img_size));
-        let size = Size::uniform(*tile_size);
-
-        group.bench_with_input(*name, &(image, size), |b, (img, tile_size)| {
-            b.iter(|| black_box(Tile::<DynamicImage>::from_image(img, tile_size)));
-        });
-    }
-
-    group.finish();
-}
-
 fn bench_wave_tick(c: &mut Criterion) {
     let mut group = c.benchmark_group("wave_tick");
 
@@ -185,20 +159,6 @@ fn configure_criterion() -> Criterion {
         .warm_up_time(std::time::Duration::from_secs(3))
 }
 
-#[cfg(feature = "image")]
-criterion_group!(
-    name = benches;
-    config = configure_criterion();
-    targets =
-        bench_maybe_collapse,
-        bench_superstate_tick,
-        bench_superstate_collapse,
-        bench_grid_operations,
-        bench_tile_from_image,
-        bench_wave_tick
-);
-
-#[cfg(not(feature = "image"))]
 criterion_group!(
     name = benches;
     config = configure_criterion();

@@ -1,0 +1,36 @@
+[package]
+name = "wave-function-collapse"
+version = "2.0.0"
+description = "Wave function collapse over an arbitrary tile set"
+keywords = ["procedural", "generation", "constraint", "wfc", "wave-function"]
+categories = ["algorithms", "data-structures", "game-development"]
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "wave_function_collapse"
+
+[dependencies]
+enum-map.workspace = true
+fxhash.workspace = true
+log.workspace = true
+# `alloc` for weighted sampling. The default features add `os_rng`, which drags in
+# getrandom and refuses to build for wasm32-unknown-unknown; every seed here comes
+# from the caller.
+rand = { workspace = true, features = ["alloc"] }
+rand_xorshift.workspace = true
+thiserror.workspace = true
+
+rayon = { version = "1.7.0", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.7.0", features = ["html_reports"] }
+
+[features]
+# Spread the possibility filter over threads.
+threaded = ["dep:rayon"]
+
+[[bench]]
+name = "wfc_benchmarks"
+harness = false
